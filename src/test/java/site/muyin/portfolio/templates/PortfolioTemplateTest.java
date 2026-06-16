@@ -40,12 +40,16 @@ class PortfolioTemplateTest {
             "title", "Halo Portfolio - 项目作品集",
             "description", "集中展示项目",
             "project", project,
+            "projectContentHtml", "<h2>详情</h2><p>支持 <strong>Markdown</strong></p>",
             "platformLabels", Map.of("github", "GitHub"),
             "typeLabels", Map.of("plugin", "插件")
         ));
 
         assertThat(listHtml).contains("GitHub", "插件");
         assertThat(detailHtml).contains("GitHub", "插件");
+        assertThat(detailHtml)
+            .contains("<h2>详情</h2>", "<strong>Markdown</strong>")
+            .doesNotContain("&lt;h2&gt;详情&lt;/h2&gt;");
     }
 
     private String render(String template, Map<String, Object> model) {

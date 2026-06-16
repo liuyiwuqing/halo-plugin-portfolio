@@ -17,7 +17,9 @@ import org.springframework.web.server.ResponseStatusException;
 import reactor.core.publisher.Mono;
 import run.halo.app.extension.PageRequestImpl;
 import run.halo.app.theme.TemplateNameResolver;
+import site.muyin.portfolio.content.ProjectContentRenderer;
 import site.muyin.portfolio.query.ProjectQuery;
+import site.muyin.portfolio.scheme.Project;
 import site.muyin.portfolio.service.PortfolioSettingService;
 import site.muyin.portfolio.service.ProjectService;
 import site.muyin.portfolio.service.impl.ProjectServiceImpl;
@@ -37,6 +39,7 @@ public class PortfolioPageRouter {
     private final TemplateNameResolver templateNameResolver;
     private final PortfolioSettingService settingService;
     private final ProjectService projectService;
+    private final ProjectContentRenderer contentRenderer;
 
     @Bean
     RouterFunction<ServerResponse> portfolioPageRouterFunction() {
@@ -72,6 +75,7 @@ public class PortfolioPageRouter {
                     model.put("title", project.getTitle() + " - " + setting.getSeoTitle());
                     model.put("description", project.getSummary() == null ? setting.getSeoDescription() : project.getSummary());
                     model.put("project", project);
+                    model.put("projectContentHtml", contentRenderer.renderMarkdown(detailContent(project)));
                     addOptionLabels(model, setting);
                     return render(request, "project-detail", model);
                 }));
@@ -118,6 +122,10 @@ public class PortfolioPageRouter {
 
     private Mono<PortfolioSetting> getSetting() {
         return settingService.getGeneralSetting();
+    }
+
+    private String detailContent(Project project) {
+        return StringUtils.hasText(project.getContent()) ? project.getContent() : project.getSummary();
     }
 
     private boolean isDefaultPageEnabled(PortfolioSetting setting) {

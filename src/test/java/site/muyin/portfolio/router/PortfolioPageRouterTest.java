@@ -20,6 +20,7 @@ import run.halo.app.extension.ListOptions;
 import run.halo.app.extension.ListResult;
 import run.halo.app.extension.PageRequest;
 import run.halo.app.theme.TemplateNameResolver;
+import site.muyin.portfolio.content.ProjectContentRenderer;
 import site.muyin.portfolio.enums.ProjectStatus;
 import site.muyin.portfolio.scheme.Project;
 import site.muyin.portfolio.service.PortfolioSettingService;
@@ -63,7 +64,8 @@ class PortfolioPageRouterTest {
         when(projectService.list(any(ListOptions.class), any(PageRequest.class)))
             .thenReturn(Mono.just(new ListResult<>(List.of(project))));
 
-        var router = new PortfolioPageRouter(templateNameResolver, settingService, projectService);
+        var router = new PortfolioPageRouter(templateNameResolver, settingService, projectService,
+            new ProjectContentRenderer());
         var client = WebTestClient.bindToRouterFunction(router.portfolioPageRouterFunction())
             .handlerStrategies(HandlerStrategies.builder()
                 .viewResolver(new ModelEchoViewResolver())
@@ -97,7 +99,8 @@ class PortfolioPageRouterTest {
         when(projectService.getPublishedBySlug("halo-portfolio"))
             .thenReturn(Mono.just(project));
 
-        var router = new PortfolioPageRouter(templateNameResolver, settingService, projectService);
+        var router = new PortfolioPageRouter(templateNameResolver, settingService, projectService,
+            new ProjectContentRenderer());
         var client = WebTestClient.bindToRouterFunction(router.portfolioPageRouterFunction())
             .handlerStrategies(HandlerStrategies.builder()
                 .viewResolver(new ModelEchoViewResolver())
@@ -130,7 +133,8 @@ class PortfolioPageRouterTest {
         when(projectService.getPublishedBySlug("halo-portfolio"))
             .thenReturn(Mono.just(project));
 
-        var router = new PortfolioPageRouter(templateNameResolver, settingService, projectService);
+        var router = new PortfolioPageRouter(templateNameResolver, settingService, projectService,
+            new ProjectContentRenderer());
         var client = WebTestClient.bindToRouterFunction(router.portfolioPageRouterFunction())
             .handlerStrategies(HandlerStrategies.builder()
                 .viewResolver(new MarkdownContentEchoViewResolver())
@@ -143,8 +147,8 @@ class PortfolioPageRouterTest {
             .expectStatus().isOk()
             .expectBody(String.class)
             .value(body -> assertThat(body)
-                .contains("<h2>亮点</h2>", "<strong>Markdown</strong>",
-                    "<a href=\"https://example.com/docs\">文档</a>")
+                .contains("<h2>亮点</h2>", "<strong>Markdown</strong>", "<a ",
+                    "href=\"https://example.com/docs\"", ">文档</a>")
                 .doesNotContain("## 亮点", "**Markdown**"));
     }
 

@@ -12,6 +12,7 @@ repositories {
 
 dependencies {
     implementation platform('run.halo.tools.platform:plugin:2.25.0')
+    implementation 'org.commonmark:commonmark:0.21.0'
     compileOnly 'run.halo.app:api'
 
     testImplementation 'run.halo.app:api'
@@ -52,4 +53,3 @@ tasks.named('generatePluginComponentsIdx') {
 halo {
     version = '2.25'
 }
-
