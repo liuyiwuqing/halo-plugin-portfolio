@@ -27,6 +27,7 @@ import site.muyin.portfolio.service.ProjectService;
 import site.muyin.portfolio.setting.PortfolioSetting;
 import site.muyin.portfolio.setting.PortfolioSetting.OptionItem;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
@@ -111,6 +112,42 @@ class PortfolioPageRouterTest {
             .isEqualTo("GitHub|插件");
     }
 
+    @Test
+    void detailPageProvidesRenderedMarkdownContentToViewModel() {
+        var setting = new PortfolioSetting();
+        when(settingService.getGeneralSetting()).thenReturn(Mono.just(setting));
+        when(templateNameResolver.resolveTemplateNameOrDefault(any(), eq("project-detail")))
+            .thenReturn(Mono.just("project-detail"));
+
+        var project = new Project()
+            .setTitle("Halo Portfolio")
+            .setSlug("halo-portfolio")
+            .setSummary("集中展示项目")
+            .setContent("## 亮点\n\n支持 **Markdown** 和 [文档](https://example.com/docs)。")
+            .setPlatform("github")
+            .setType("plugin")
+            .setStatus(ProjectStatus.PUBLISHED);
+        when(projectService.getPublishedBySlug("halo-portfolio"))
+            .thenReturn(Mono.just(project));
+
+        var router = new PortfolioPageRouter(templateNameResolver, settingService, projectService);
+        var client = WebTestClient.bindToRouterFunction(router.portfolioPageRouterFunction())
+            .handlerStrategies(HandlerStrategies.builder()
+                .viewResolver(new MarkdownContentEchoViewResolver())
+                .build())
+            .build();
+
+        client.get()
+            .uri("/projects/halo-portfolio")
+            .exchange()
+            .expectStatus().isOk()
+            .expectBody(String.class)
+            .value(body -> assertThat(body)
+                .contains("<h2>亮点</h2>", "<strong>Markdown</strong>",
+                    "<a href=\"https://example.com/docs\">文档</a>")
+                .doesNotContain("## 亮点", "**Markdown**"));
+    }
+
     private static class ModelEchoViewResolver implements ViewResolver {
 
         @Override
@@ -123,6 +160,21 @@ class PortfolioPageRouterTest {
             var platformLabels = (Map<String, String>) model.get("platformLabels");
             var typeLabels = (Map<String, String>) model.get("typeLabels");
             var body = platformLabels.get("github") + "|" + typeLabels.get("plugin");
+            var buffer = new DefaultDataBufferFactory().wrap(body.getBytes(StandardCharsets.UTF_8));
+            exchange.getResponse().getHeaders().setContentType(MediaType.TEXT_PLAIN);
+            return exchange.getResponse().writeWith(Mono.just(buffer));
+        }
+    }
+
+    private static class MarkdownContentEchoViewResolver implements ViewResolver {
+
+        @Override
+        public Mono<View> resolveViewName(String viewName, Locale locale) {
+            return Mono.just((model, contentType, exchange) -> writeModel(model, exchange));
+        }
+
+        private Mono<Void> writeModel(Map<String, ?> model, ServerWebExchange exchange) {
+            var body = String.valueOf(model.get("projectContentHtml"));
             var buffer = new DefaultDataBufferFactory().wrap(body.getBytes(StandardCharsets.UTF_8));
             exchange.getResponse().getHeaders().setContentType(MediaType.TEXT_PLAIN);
             return exchange.getResponse().writeWith(Mono.just(buffer));
