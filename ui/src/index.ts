@@ -1,6 +1,6 @@
 import { definePlugin } from '@halo-dev/ui-shared'
-import { IconPlug } from '@halo-dev/components'
 import { markRaw } from 'vue'
+import RiCodeBoxLine from '~icons/ri/code-box-line'
 
 export default definePlugin({
   components: {},
@@ -8,16 +8,18 @@ export default definePlugin({
     {
       parentName: 'Root',
       route: {
-        path: '/example',
-        name: 'Example',
-        component: () => import(/* webpackChunkName: "HomeView" */ './views/HomeView.vue'),
+        path: '/portfolio',
+        name: 'PortfolioProjectManager',
+        component: () =>
+          import(/* webpackChunkName: "ProjectManagerView" */ './views/ProjectManagerView.vue'),
         meta: {
-          title: '示例页面',
+          title: '项目管理',
           searchable: true,
+          permissions: ['plugin:portfolio:project:view'],
           menu: {
-            name: '示例页面',
-            group: '示例分组',
-            icon: markRaw(IconPlug),
+            name: '项目管理',
+            group: 'tool',
+            icon: markRaw(RiCodeBoxLine),
             priority: 0,
           },
         },

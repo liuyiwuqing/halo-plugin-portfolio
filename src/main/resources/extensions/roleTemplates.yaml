@@ -1,0 +1,73 @@
+kind: Role
+apiVersion: v1alpha1
+metadata:
+  name: rt-console.portfolio.muyin.site-projects
+  labels:
+    halo.run/role-template: "true"
+  annotations:
+    rbac.authorization.halo.run/ui-permissions: |
+      ["plugin:portfolio:project:view"]
+    rbac.authorization.halo.run/display-name: "查看项目"
+    rbac.authorization.halo.run/module: "作品集管理"
+rules:
+  - apiGroups:
+      - console.portfolio.muyin.site
+    resources:
+      - projects
+    verbs:
+      - get
+      - list
+  - nonResourceURLs:
+      - /apis/console.portfolio.muyin.site/v1alpha1/projects/settings/options
+    verbs:
+      - get
+---
+kind: Role
+apiVersion: v1alpha1
+metadata:
+  name: rt-console.portfolio.muyin.site-projects-manage
+  labels:
+    halo.run/role-template: "true"
+  annotations:
+    rbac.authorization.halo.run/dependencies: |
+      ["rt-console.portfolio.muyin.site-projects"]
+    rbac.authorization.halo.run/ui-permissions: |
+      ["plugin:portfolio:project:manage"]
+    rbac.authorization.halo.run/display-name: "管理项目"
+    rbac.authorization.halo.run/module: "作品集管理"
+rules:
+  - apiGroups:
+      - console.portfolio.muyin.site
+    resources:
+      - projects
+      - projects/delete
+    verbs:
+      - get
+      - list
+      - create
+      - update
+      - delete
+  - nonResourceURLs:
+      - /apis/console.portfolio.muyin.site/v1alpha1/projects/create
+      - /apis/console.portfolio.muyin.site/v1alpha1/projects/update
+    verbs:
+      - create
+      - update
+---
+kind: Role
+apiVersion: v1alpha1
+metadata:
+  name: rt-public.portfolio.muyin.site-anonymous
+  labels:
+    halo.run/role-template: "true"
+    halo.run/hidden: "true"
+    rbac.authorization.halo.run/aggregate-to-anonymous: "true"
+rules:
+  - apiGroups:
+      - public.portfolio.muyin.site
+    resources:
+      - projects
+      - projects/featured
+    verbs:
+      - get
+      - list
