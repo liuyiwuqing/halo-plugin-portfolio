@@ -33,6 +33,11 @@ import {
   type ProjectStatus,
 } from '@/api/portfolio'
 
+const PROJECT_API_VERSION = 'portfolio.muyin.site/v1alpha1'
+const PROJECT_KIND = 'Project'
+
+type ProjectForm = Partial<Project> & Pick<Project, 'title' | 'slug'>
+
 const statusOptions: Array<{ label: string; value: ProjectStatus | '' }> = [
   { label: '全部', value: '' },
   { label: '草稿', value: 'draft' },
@@ -62,7 +67,7 @@ const filters = reactive({
   status: '' as ProjectStatus | '',
 })
 
-const form = reactive<Project>({
+const form = reactive<ProjectForm>({
   title: '',
   slug: '',
   summary: '',
@@ -135,9 +140,8 @@ function handleCoverSelect(attachments: AttachmentLike[]) {
   coverPickerVisible.value = false
 }
 
-function resetForm() {
-  Object.assign(form, {
-    metadata: undefined,
+function createProjectForm(): ProjectForm {
+  return {
     title: '',
     slug: '',
     summary: '',
@@ -156,7 +160,11 @@ function resetForm() {
     priority: 0,
     featured: false,
     status: 'draft',
-  })
+  }
+}
+
+function resetForm() {
+  Object.assign(form, createProjectForm())
   techStacksText.value = ''
   tagsText.value = ''
 }
@@ -169,7 +177,7 @@ function openCreateModal() {
 
 function openEditModal(project: Project) {
   editing.value = true
-  Object.assign(form, JSON.parse(JSON.stringify(project)))
+  Object.assign(form, createProjectForm(), JSON.parse(JSON.stringify(project)))
   techStacksText.value = project.techStacks?.join(', ') || ''
   tagsText.value = project.tags?.join(', ') || ''
   modalVisible.value = true
@@ -192,6 +200,38 @@ function validateForm() {
     return false
   }
   return true
+}
+
+function buildProjectPayload(): Project {
+  const slug = form.slug.trim()
+  return {
+    apiVersion: form.apiVersion || PROJECT_API_VERSION,
+    kind: form.kind || PROJECT_KIND,
+    metadata: {
+      ...form.metadata,
+      name: form.metadata?.name || `project-${slug}`,
+    },
+    title: form.title.trim(),
+    slug,
+    summary: form.summary,
+    content: form.content,
+    cover: form.cover,
+    platform: form.platform,
+    type: form.type,
+    techStacks: splitText(techStacksText.value),
+    tags: splitText(tagsText.value),
+    repoUrl: form.repoUrl,
+    demoUrl: form.demoUrl,
+    docsUrl: form.docsUrl,
+    sourceProvider: form.sourceProvider,
+    repoOwner: form.repoOwner,
+    repoName: form.repoName,
+    priority: form.priority ?? 0,
+    featured: form.featured ?? false,
+    status: form.status || 'draft',
+    createTime: form.createTime,
+    updateTime: form.updateTime,
+  }
 }
 
 async function fetchProjects() {
@@ -233,16 +273,7 @@ async function fetchOptions() {
 
 async function submitForm() {
   if (!validateForm()) return
-  const payload: Project = {
-    ...form,
-    slug: form.slug?.trim(),
-    title: form.title?.trim(),
-    techStacks: splitText(techStacksText.value),
-    tags: splitText(tagsText.value),
-  }
-  if (!editing.value) {
-    delete payload.metadata
-  }
+  const payload = buildProjectPayload()
   try {
     if (editing.value) {
       await portfolioApi.update(payload)
@@ -268,7 +299,7 @@ function deleteProject(project: Project) {
     confirmText: '删除',
     cancelText: '取消',
     onConfirm: async () => {
-      await portfolioApi.delete(project.slug as string)
+      await portfolioApi.delete(project.slug)
       Toast.success('删除成功')
       await fetchProjects()
     },

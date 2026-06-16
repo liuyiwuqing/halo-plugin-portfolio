@@ -1,56 +1,23 @@
 import { axiosInstance } from '@halo-dev/api-client'
+import {
+  ConsolePortfolioMuyinSiteV1alpha1PortfolioApi,
+  type ConsolePortfolioMuyinSiteV1alpha1PortfolioApiProjectListForConsoleRequest,
+  type Project,
+  type ProjectList,
+  type ProjectStatusEnum,
+} from './generated'
+import type { AxiosResponse } from 'axios'
 
-const consoleBase = '/apis/console.portfolio.muyin.site/v1alpha1/projects'
+const consolePortfolioApi = new ConsolePortfolioMuyinSiteV1alpha1PortfolioApi(
+  undefined,
+  '',
+  axiosInstance,
+)
 
-export type ProjectStatus = 'draft' | 'published' | 'archived'
+export type { Project, ProjectList }
+export type ProjectStatus = ProjectStatusEnum
 
-export interface Metadata {
-  name?: string
-  creationTimestamp?: string
-  annotations?: Record<string, string>
-  labels?: Record<string, string>
-}
-
-export interface Project {
-  metadata?: Metadata
-  title?: string
-  slug?: string
-  summary?: string
-  content?: string
-  cover?: string
-  platform?: string
-  type?: string
-  techStacks?: string[]
-  tags?: string[]
-  repoUrl?: string
-  demoUrl?: string
-  docsUrl?: string
-  sourceProvider?: string
-  repoOwner?: string
-  repoName?: string
-  priority?: number
-  featured?: boolean
-  status?: ProjectStatus
-  createTime?: string
-  updateTime?: string
-}
-
-export interface ListResult<T> {
-  page: number
-  size: number
-  total: number
-  items: T[]
-}
-
-export interface ProjectQuery {
-  page?: number
-  size?: number
-  keyword?: string
-  platform?: string
-  type?: string
-  status?: string
-  tag?: string
-}
+export type ProjectQuery = ConsolePortfolioMuyinSiteV1alpha1PortfolioApiProjectListForConsoleRequest
 
 export interface OptionItem {
   label?: string
@@ -63,11 +30,12 @@ export interface ProjectOptions {
 }
 
 export const portfolioApi = {
-  list: (params: ProjectQuery) =>
-    axiosInstance.get<ListResult<Project>>(`${consoleBase}/list`, { params }),
-  create: (data: Project) => axiosInstance.post<Project>(`${consoleBase}/create`, data),
-  update: (data: Project) => axiosInstance.post<Project>(`${consoleBase}/update`, data),
-  delete: (slug: string) =>
-    axiosInstance.delete<Project>(`${consoleBase}/${encodeURIComponent(slug)}/delete`),
-  options: () => axiosInstance.get<ProjectOptions>(`${consoleBase}/settings/options`),
+  list: (params: ProjectQuery = {}) => consolePortfolioApi.projectListForConsole(params),
+  create: (project: Project) => consolePortfolioApi.projectCreateForConsole({ project }),
+  update: (project: Project) => consolePortfolioApi.projectUpdateForConsole({ project }),
+  delete: (slug: string) => consolePortfolioApi.projectDeleteForConsole({ slug }),
+  options: () =>
+    consolePortfolioApi.projectOptionsForConsole() as unknown as Promise<
+      AxiosResponse<ProjectOptions>
+    >,
 }

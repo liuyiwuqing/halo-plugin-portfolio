@@ -17,7 +17,7 @@ spec:
   homepage: https://github.com/liuyiwuqing/plugin-portfolio#readme
   repo: https://github.com/liuyiwuqing/plugin-portfolio
   issues: https://github.com/liuyiwuqing/plugin-portfolio/issues
-  displayName: "Portfolio"
+  displayName: "项目集"
   description: "统一管理和展示 GitHub、Gitee、产品、插件、工具等项目作品。"
   license:
     - name: "GPL-3.0"

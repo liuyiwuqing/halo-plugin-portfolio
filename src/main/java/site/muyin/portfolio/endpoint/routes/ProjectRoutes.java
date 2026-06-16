@@ -13,6 +13,7 @@ import org.springframework.web.reactive.function.server.ServerResponse;
 import org.springframework.web.server.ResponseStatusException;
 import reactor.core.publisher.Mono;
 import run.halo.app.extension.ListResult;
+import site.muyin.portfolio.model.ProjectOptions;
 import site.muyin.portfolio.query.ProjectQuery;
 import site.muyin.portfolio.scheme.Project;
 import site.muyin.portfolio.service.PortfolioSettingService;
@@ -48,7 +49,8 @@ public class ProjectRoutes {
                 ProjectQuery.buildParameters(builder);
             })
             .GET("/settings/options", this::optionsForConsole,
-                builder -> builder.operationId("project-options-for-console").description("获取项目配置选项").tag(tag))
+                builder -> builder.operationId("project-options-for-console").description("获取项目配置选项").tag(tag)
+                    .response(responseBuilder().implementation(ProjectOptions.class)))
             .GET("/{slug}", this::detailForConsole,
                 builder -> builder.operationId("project-detail-for-console").description("获取项目详情").tag(tag)
                     .parameter(parameterBuilder().name("slug").in(ParameterIn.PATH).description("项目 slug")

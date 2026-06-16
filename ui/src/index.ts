@@ -1,5 +1,6 @@
 import { definePlugin } from '@halo-dev/ui-shared'
 import { markRaw } from 'vue'
+import { PortfolioProjectCardExtension } from '@/editor/project-card'
 import RiCodeBoxLine from '~icons/ri/code-box-line'
 
 export default definePlugin({
@@ -26,5 +27,7 @@ export default definePlugin({
       },
     },
   ],
-  extensionPoints: {},
+  extensionPoints: {
+    'default:editor:extension:create': () => [PortfolioProjectCardExtension as never],
+  },
 })

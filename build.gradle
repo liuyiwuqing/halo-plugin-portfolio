@@ -51,5 +51,29 @@ tasks.named('generatePluginComponentsIdx') {
 }
 
 halo {
+    externalUrl = 'http://127.0.0.1:8090'
     version = '2.25'
+}
+
+haloPlugin {
+    openApi {
+        useExistingServer = true
+        outputDir = file("$rootDir/api-docs/openapi/v3_0")
+        groupingRules {
+            portfolioApis {
+                displayName = 'Extension API for Portfolio Plugin'
+                pathsToMatch = [
+                        '/apis/public.portfolio.muyin.site/v1alpha1/**',
+                        '/apis/console.portfolio.muyin.site/v1alpha1/**',
+                        '/apis/uc.product.portfolio.site/v1alpha1/**'
+                ]
+            }
+        }
+        groupedApiMappings = [
+                '/v3/api-docs/portfolioApis': 'portfolioApis.json'
+        ]
+        generator {
+            outputDir = file("${projectDir}/ui/src/api/generated")
+        }
+    }
 }
