@@ -65,7 +65,7 @@ haloPlugin {
                 pathsToMatch = [
                         '/apis/public.portfolio.muyin.site/v1alpha1/**',
                         '/apis/console.portfolio.muyin.site/v1alpha1/**',
-                        '/apis/uc.product.portfolio.site/v1alpha1/**'
+                        '/apis/uc.portfolio.muyin.site/v1alpha1/**'
                 ]
             }
         }
