@@ -14,11 +14,11 @@ spec:
   settingName: plugin-portfolio-settings
   configMapName: plugin-portfolio-configmap
   logo: logo.png
-  homepage: https://github.com/liuyiwuqing/plugin-portfolio#readme
-  repo: https://github.com/liuyiwuqing/plugin-portfolio
-  issues: https://github.com/liuyiwuqing/plugin-portfolio/issues
+  homepage: https://github.com/liuyiwuqing/halo-plugin-portfolio#readme
+  repo: https://github.com/liuyiwuqing/halo-plugin-portfolio
+  issues: https://github.com/liuyiwuqing/halo-plugin-portfolio/issues
   displayName: "项目集"
   description: "统一管理和展示 GitHub、Gitee、产品、插件、工具等项目作品。"
   license:
     - name: "GPL-3.0"
-      url: "https://github.com/liuyiwuqing/plugin-portfolio/blob/main/LICENSE"
+      url: "https://github.com/liuyiwuqing/halo-plugin-portfolio/blob/main/LICENSE"

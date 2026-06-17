@@ -1,7 +1,7 @@
 # 项目集（Portfolio）
 
-[![CI](https://github.com/liuyiwuqing/plugin-portfolio/actions/workflows/ci.yaml/badge.svg)](https://github.com/liuyiwuqing/plugin-portfolio/actions/workflows/ci.yaml)
-[![License](https://img.shields.io/github/license/liuyiwuqing/plugin-portfolio)](./LICENSE)
+[![CI](https://github.com/liuyiwuqing/halo-plugin-portfolio/actions/workflows/ci.yaml/badge.svg)](https://github.com/liuyiwuqing/halo-plugin-portfolio/actions/workflows/ci.yaml)
+[![License](https://img.shields.io/github/license/liuyiwuqing/halo-plugin-portfolio)](./LICENSE)
 [![Halo](https://img.shields.io/badge/Halo-%3E%3D2.24.0-blue)](https://halo.run)
 
 > Halo CMS 插件 —— 统一管理和展示 GitHub、Gitee、产品、插件、工具等项目作品。
@@ -30,14 +30,14 @@
 
 ### 方式一：从 Release 安装（推荐）
 
-1. 前往 [Releases](https://github.com/liuyiwuqing/plugin-portfolio/releases) 下载最新 `.jar` 文件
+1. 前往 [Releases](https://github.com/liuyiwuqing/halo-plugin-portfolio/releases) 下载最新 `.jar` 文件
 2. 在 Halo 控制台 → 插件管理 → 安装插件，上传 jar 文件
 3. 启用插件
 
 ### 方式二：从源码构建
 
 ```bash
-git clone https://github.com/liuyiwuqing/plugin-portfolio.git
+git clone https://github.com/liuyiwuqing/halo-plugin-portfolio.git
 cd plugin-portfolio
 ./gradlew build
 ```
