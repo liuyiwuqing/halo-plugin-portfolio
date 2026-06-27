@@ -12,6 +12,7 @@ import reactor.core.publisher.Mono;
 import run.halo.app.extension.ListOptions;
 import run.halo.app.extension.ListResult;
 import run.halo.app.extension.PageRequest;
+import site.muyin.portfolio.content.ProjectCardRenderer;
 import site.muyin.portfolio.content.ProjectContentRenderer;
 import site.muyin.portfolio.model.ProjectOptions;
 import site.muyin.portfolio.query.ProjectQuery;
@@ -199,7 +200,35 @@ class ProjectFinderImplTest {
             .doesNotContain("<script>", "alert(1)", "摘要");
     }
 
+    @Test
+    void renderContentRendersPortfolioProjectCardsForThemeFinder() {
+        var embeddedProject = new Project()
+            .setSlug("embedded-project")
+            .setTitle("Embedded Project")
+            .setSummary("被 Finder 正文引用的项目")
+            .setPlatform("github")
+            .setType("plugin");
+        when(projectService.getPublishedBySlug("embedded-project"))
+            .thenReturn(Mono.just(embeddedProject));
+        var finder = finder();
+        var project = new Project()
+            .setSummary("摘要")
+            .setContent("""
+                推荐项目：
+
+                <portfolio-project-card data-slug="embedded-project"></portfolio-project-card>
+                """);
+
+        var html = finder.renderContent(project);
+
+        assertThat(html)
+            .contains("data-portfolio-rendered-project-card", "Embedded Project",
+                "href=\"/portfolio/embedded-project\"")
+            .doesNotContain("<portfolio-project-card");
+    }
+
     private ProjectFinderImpl finder() {
-        return new ProjectFinderImpl(projectService, settingService, new ProjectContentRenderer());
+        return new ProjectFinderImpl(projectService, settingService, new ProjectContentRenderer(),
+            new ProjectCardRenderer(projectService));
     }
 }

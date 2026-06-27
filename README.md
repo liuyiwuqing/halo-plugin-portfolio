@@ -19,9 +19,9 @@
 - **多类型分类** — 开源项目、产品、插件、网站、工具、类库，同样支持自定义
 - **技术栈 & 标签** — 每个项目可关联多个技术栈和展示标签，方便筛选和检索
 - **推荐项目** — 标记重点项目，在首页或侧边栏优先展示
-- **默认页面** — 开箱即用的 `/projects` 列表页和 `/projects/{slug}` 详情页，支持主题覆盖
-- **Finder API** — 注册 `projectFinder`，主题模板可直接调用，灵活控制渲染
-- **编辑器卡片** — 在 Halo 富文本编辑器中插入项目卡片，在文章中嵌入项目展示
+- **默认页面** — 开箱即用的 `/portfolio` 列表页和 `/portfolio/{slug}` 详情页，支持主题覆盖
+- **Finder API** — 注册 `projectFinder`，主题模板可直接调用，灵活控制查询与内容渲染
+- **编辑器卡片** — 在 Halo 富文本编辑器中插入项目卡片，在文章、单页和项目详情中嵌入项目展示
 - **Markdown 内容** — 项目详情支持 Markdown 编写，自动渲染为安全 HTML
 - **RBAC 权限** — 内置查看 / 管理两级角色模板，支持细粒度权限控制
 - **SEO 友好** — 自定义页面标题和描述，详情页自动生成 meta 信息
@@ -50,7 +50,7 @@ cd plugin-portfolio
 
 | 配置项 | 说明 | 默认值 |
 | --- | --- | --- |
-| 启用默认展示页 | 开启后提供 `/projects` 和 `/projects/{slug}` 路由 | 开启 |
+| 启用默认展示页 | 开启后提供 `/portfolio` 和 `/portfolio/{slug}` 路由 | 开启 |
 | 默认每页数量 | 列表页每页显示项目数 | 12 |
 | 默认 SEO 标题 | 页面 `<title>` 和 OG 标题 | 项目作品集 |
 | 默认 SEO 描述 | 页面 `<meta description>` | 集中展示开源项目、产品、插件、工具和其他开发作品。 |
@@ -76,13 +76,13 @@ cd plugin-portfolio
 | `listByTechStack(techStack, page, size)` | `ListResult<Project>` | 按技术栈筛选 |
 | `listByTag(tag, page, size)` | `ListResult<Project>` | 按展示标签筛选 |
 | `featured(page, size)` | `ListResult<Project>` | 获取推荐项目 |
-| `recent(size)` | `List<Project>` | 获取最近项目（不分页） |
+| `recent(size)` | `ListResult<Project>` | 获取最近项目 |
 | `count()` | `long` | 公开项目总数 |
 | `options()` | `ProjectOptions` | 获取平台和类型选项列表 |
 | `setting()` | `PortfolioSetting` | 获取插件通用设置 |
 | `platformLabels()` | `Map<String, String>` | 平台 value → label 映射表 |
 | `typeLabels()` | `Map<String, String>` | 类型 value → label 映射表 |
-| `renderContent(project)` | `String` | 将项目 Markdown 内容渲染为安全 HTML |
+| `renderContent(project)` | `String` | 将项目 Markdown 内容渲染为安全 HTML，并解析项目卡片短码 |
 | `listAll()` | `Flux<Project>` | 获取全部公开项目流 |
 | `getBySlug(slug)` | `Mono<Project>` | 按 slug 获取单个项目 |
 
@@ -96,7 +96,7 @@ cd plugin-portfolio
                    typeLabels=${projectFinder.typeLabels()}">
   <div class="project-grid">
     <article th:each="project : ${projects.items}" class="project-card">
-      <a th:href="@{/projects/{slug}(slug=${project.slug})}">
+      <a th:href="@{/portfolio/{slug}(slug=${project.slug})}">
         <img th:if="${project.cover}" th:src="${project.cover}" th:alt="${project.title}" />
         <h3 th:text="${project.title}">项目标题</h3>
         <p th:text="${project.summary}">项目简介</p>
@@ -114,12 +114,14 @@ cd plugin-portfolio
 <div th:utext="${projectFinder.renderContent(project)}"></div>
 ```
 
+`renderContent(project)` 会优先渲染项目的 `content` 字段；如果内容为空，则回退到 `summary`。输出内容已经过安全处理，并会继续把 `<portfolio-project-card data-slug="...">` 渲染为真实项目卡片。
+
 **按技术栈筛选：**
 
 ```html
 <th:block th:with="projects=${projectFinder.listByTechStack('Vue', 1, 10)}">
   <div th:each="project : ${projects.items}">
-    <a th:href="@{/projects/{slug}(slug=${project.slug})}" th:text="${project.title}">标题</a>
+    <a th:href="@{/portfolio/{slug}(slug=${project.slug})}" th:text="${project.title}">标题</a>
   </div>
 </th:block>
 ```
@@ -130,8 +132,8 @@ cd plugin-portfolio
 
 | 路由 | 模板 | 说明 |
 | --- | --- | --- |
-| `/projects` | `projects.html` | 项目列表页，响应式网格布局，支持分页 |
-| `/projects/{slug}` | `project-detail.html` | 项目详情页，展示封面、元数据和 Markdown 内容 |
+| `/portfolio` | `portfolio.html` | 项目列表页，响应式网格布局，支持分页 |
+| `/portfolio/{slug}` | `portfolio-detail.html` | 项目详情页，展示封面、元数据和 Markdown 内容，并自动渲染项目卡片短码 |
 
 主题可通过提供同名模板覆盖默认页面。关闭设置中的「启用默认展示页」后，插件不再注册路由，完全由主题自行渲染。
 
@@ -139,7 +141,26 @@ cd plugin-portfolio
 
 在 Halo 富文本编辑器中，可通过工具栏或斜杠命令 `/` 插入「项目卡片」节点。选择一个已发布项目后，文章中会嵌入一个可交互的卡片组件。
 
-卡片在前端渲染为 `<portfolio-project-card data-slug="xxx">` 标签，发布时由插件自动替换为带样式的 HTML 卡片，包含封面、标题、摘要和元数据标签。
+卡片在内容中保存为 `<portfolio-project-card data-slug="xxx">` 标签。插件会在以下链路自动替换为带样式的 HTML 卡片，包含封面、标题、摘要和元数据标签：
+
+- 文章内容渲染
+- 独立页面内容渲染
+- 默认项目详情页 `/portfolio/{slug}`
+- 主题模板调用 `projectFinder.renderContent(project)`
+
+也可以在项目详情 Markdown 中手写卡片短码：
+
+```html
+<portfolio-project-card data-slug="halo-portfolio"></portfolio-project-card>
+```
+
+渲染规则：
+
+- `data-slug` 必须指向已发布项目的 `slug`
+- 找到已发布项目时，输出真实项目卡片
+- 项目不存在或未发布时，输出「项目卡片不可用」提示卡片
+- 未配置 `data-slug` 时，输出「项目卡片未配置」提示卡片
+- 为兼容旧内容，也支持空的 `<div data-portfolio-project-card data-slug="xxx"></div>` 写法
 
 ## 项目数据模型
 
@@ -228,8 +249,11 @@ cd ui && pnpm build
 # 运行后端测试
 ./gradlew test
 
-# 运行前端检查
-cd ui && pnpm check
+# 运行前端类型检查
+cd ui && pnpm type-check
+
+# 运行前端单元测试
+cd ui && pnpm test:unit
 ```
 
 构建产物：`build/libs/plugin-portfolio-*.jar`

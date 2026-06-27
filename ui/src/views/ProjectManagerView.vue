@@ -316,7 +316,7 @@ function resetFilters() {
 }
 
 function handleRouteToFront() {
-  window.open('/projects', '_blank')
+  window.open('/portfolio', '_blank')
 }
 
 watch([() => filters.status, () => filters.platform, () => filters.type], () => {

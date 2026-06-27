@@ -20,6 +20,7 @@ import run.halo.app.extension.ListOptions;
 import run.halo.app.extension.ListResult;
 import run.halo.app.extension.PageRequest;
 import run.halo.app.theme.TemplateNameResolver;
+import site.muyin.portfolio.content.ProjectCardRenderer;
 import site.muyin.portfolio.content.ProjectContentRenderer;
 import site.muyin.portfolio.enums.ProjectStatus;
 import site.muyin.portfolio.scheme.Project;
@@ -51,8 +52,8 @@ class PortfolioPageRouterTest {
         setting.setPlatformOptions(List.of(new OptionItem("GitHub", "github")));
         setting.setTypeOptions(List.of(new OptionItem("插件", "plugin")));
         when(settingService.getGeneralSetting()).thenReturn(Mono.just(setting));
-        when(templateNameResolver.resolveTemplateNameOrDefault(any(), eq("projects")))
-            .thenReturn(Mono.just("projects"));
+        when(templateNameResolver.resolveTemplateNameOrDefault(any(), eq("portfolio")))
+            .thenReturn(Mono.just("portfolio"));
 
         var project = new Project()
             .setTitle("Halo Portfolio")
@@ -65,7 +66,7 @@ class PortfolioPageRouterTest {
             .thenReturn(Mono.just(new ListResult<>(List.of(project))));
 
         var router = new PortfolioPageRouter(templateNameResolver, settingService, projectService,
-            new ProjectContentRenderer());
+            new ProjectContentRenderer(), new ProjectCardRenderer(projectService));
         var client = WebTestClient.bindToRouterFunction(router.portfolioPageRouterFunction())
             .handlerStrategies(HandlerStrategies.builder()
                 .viewResolver(new ModelEchoViewResolver())
@@ -73,7 +74,7 @@ class PortfolioPageRouterTest {
             .build();
 
         client.get()
-            .uri("/projects")
+            .uri("/portfolio")
             .exchange()
             .expectStatus().isOk()
             .expectBody(String.class)
@@ -86,8 +87,8 @@ class PortfolioPageRouterTest {
         setting.setPlatformOptions(List.of(new OptionItem("GitHub", "github")));
         setting.setTypeOptions(List.of(new OptionItem("插件", "plugin")));
         when(settingService.getGeneralSetting()).thenReturn(Mono.just(setting));
-        when(templateNameResolver.resolveTemplateNameOrDefault(any(), eq("project-detail")))
-            .thenReturn(Mono.just("project-detail"));
+        when(templateNameResolver.resolveTemplateNameOrDefault(any(), eq("portfolio-detail")))
+            .thenReturn(Mono.just("portfolio-detail"));
 
         var project = new Project()
             .setTitle("Halo Portfolio")
@@ -100,7 +101,7 @@ class PortfolioPageRouterTest {
             .thenReturn(Mono.just(project));
 
         var router = new PortfolioPageRouter(templateNameResolver, settingService, projectService,
-            new ProjectContentRenderer());
+            new ProjectContentRenderer(), new ProjectCardRenderer(projectService));
         var client = WebTestClient.bindToRouterFunction(router.portfolioPageRouterFunction())
             .handlerStrategies(HandlerStrategies.builder()
                 .viewResolver(new ModelEchoViewResolver())
@@ -108,7 +109,7 @@ class PortfolioPageRouterTest {
             .build();
 
         client.get()
-            .uri("/projects/halo-portfolio")
+            .uri("/portfolio/halo-portfolio")
             .exchange()
             .expectStatus().isOk()
             .expectBody(String.class)
@@ -119,8 +120,8 @@ class PortfolioPageRouterTest {
     void detailPageProvidesRenderedMarkdownContentToViewModel() {
         var setting = new PortfolioSetting();
         when(settingService.getGeneralSetting()).thenReturn(Mono.just(setting));
-        when(templateNameResolver.resolveTemplateNameOrDefault(any(), eq("project-detail")))
-            .thenReturn(Mono.just("project-detail"));
+        when(templateNameResolver.resolveTemplateNameOrDefault(any(), eq("portfolio-detail")))
+            .thenReturn(Mono.just("portfolio-detail"));
 
         var project = new Project()
             .setTitle("Halo Portfolio")
@@ -134,7 +135,7 @@ class PortfolioPageRouterTest {
             .thenReturn(Mono.just(project));
 
         var router = new PortfolioPageRouter(templateNameResolver, settingService, projectService,
-            new ProjectContentRenderer());
+            new ProjectContentRenderer(), new ProjectCardRenderer(projectService));
         var client = WebTestClient.bindToRouterFunction(router.portfolioPageRouterFunction())
             .handlerStrategies(HandlerStrategies.builder()
                 .viewResolver(new MarkdownContentEchoViewResolver())
@@ -142,7 +143,7 @@ class PortfolioPageRouterTest {
             .build();
 
         client.get()
-            .uri("/projects/halo-portfolio")
+            .uri("/portfolio/halo-portfolio")
             .exchange()
             .expectStatus().isOk()
             .expectBody(String.class)
@@ -150,6 +151,68 @@ class PortfolioPageRouterTest {
                 .contains("<h2>亮点</h2>", "<strong>Markdown</strong>", "<a ",
                     "href=\"https://example.com/docs\"", ">文档</a>")
                 .doesNotContain("## 亮点", "**Markdown**"));
+    }
+
+    @Test
+    void detailPageRendersPortfolioProjectCardsInContent() {
+        var setting = new PortfolioSetting();
+        when(settingService.getGeneralSetting()).thenReturn(Mono.just(setting));
+        when(templateNameResolver.resolveTemplateNameOrDefault(any(), eq("portfolio-detail")))
+            .thenReturn(Mono.just("portfolio-detail"));
+
+        var project = new Project()
+            .setTitle("Halo Portfolio")
+            .setSlug("halo-portfolio")
+            .setSummary("集中展示项目")
+            .setContent("""
+                正文推荐：
+
+                <portfolio-project-card data-slug="embedded-project"></portfolio-project-card>
+                """)
+            .setPlatform("github")
+            .setType("plugin")
+            .setStatus(ProjectStatus.PUBLISHED);
+        var embeddedProject = new Project()
+            .setTitle("Embedded Project")
+            .setSlug("embedded-project")
+            .setSummary("被详情页正文引用的项目")
+            .setPlatform("github")
+            .setType("plugin")
+            .setStatus(ProjectStatus.PUBLISHED);
+        when(projectService.getPublishedBySlug("halo-portfolio"))
+            .thenReturn(Mono.just(project));
+        when(projectService.getPublishedBySlug("embedded-project"))
+            .thenReturn(Mono.just(embeddedProject));
+
+        var router = new PortfolioPageRouter(templateNameResolver, settingService, projectService,
+            new ProjectContentRenderer(), new ProjectCardRenderer(projectService));
+        var client = WebTestClient.bindToRouterFunction(router.portfolioPageRouterFunction())
+            .handlerStrategies(HandlerStrategies.builder()
+                .viewResolver(new MarkdownContentEchoViewResolver())
+                .build())
+            .build();
+
+        client.get()
+            .uri("/portfolio/halo-portfolio")
+            .exchange()
+            .expectStatus().isOk()
+            .expectBody(String.class)
+            .value(body -> assertThat(body)
+                .contains("data-portfolio-rendered-project-card", "Embedded Project",
+                    "href=\"/portfolio/embedded-project\"")
+                .doesNotContain("<portfolio-project-card"));
+    }
+
+    @Test
+    void oldProjectsPageRouteIsNotRegistered() {
+        var router = new PortfolioPageRouter(templateNameResolver, settingService, projectService,
+            new ProjectContentRenderer(), new ProjectCardRenderer(projectService));
+        var client = WebTestClient.bindToRouterFunction(router.portfolioPageRouterFunction()).build();
+
+        client.get()
+            .uri("/projects")
+            .exchange()
+            .expectStatus().isNotFound();
     }
 
     private static class ModelEchoViewResolver implements ViewResolver {

@@ -29,6 +29,8 @@ public class ProjectCardRenderer {
     private static final Pattern SLUG_ATTRIBUTE_PATTERN = Pattern.compile(
         "(?is)\\bdata-slug\\s*=\\s*(?:\"([^\"]*)\"|'([^']*)'|([^\\s>]+))");
 
+    private static final String PUBLIC_PAGE_BASE_PATH = "/portfolio";
+
     private static final String CARD_STYLE = "display:block;margin:22px 0;border:1px solid rgba(148,163,184,.22);"
         + "border-color:color-mix(in srgb,currentColor 16%,transparent);border-radius:8px;"
         + "background:rgba(148,163,184,.08);background:color-mix(in srgb,currentColor 7%,transparent);"
@@ -145,7 +147,7 @@ public class ProjectCardRenderer {
         var title = textOrDefault(project.getTitle(), slug);
         var summary = textOrDefault(project.getSummary(), "暂无项目简介");
         var cover = safeUrl(project.getCover());
-        var href = "/projects/" + UriUtils.encodePathSegment(slug, StandardCharsets.UTF_8);
+        var href = PUBLIC_PAGE_BASE_PATH + "/" + UriUtils.encodePathSegment(slug, StandardCharsets.UTF_8);
         var meta = projectMeta(project);
 
         return """

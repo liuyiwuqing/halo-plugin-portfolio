@@ -17,6 +17,7 @@ import org.springframework.web.server.ResponseStatusException;
 import reactor.core.publisher.Mono;
 import run.halo.app.extension.PageRequestImpl;
 import run.halo.app.theme.TemplateNameResolver;
+import site.muyin.portfolio.content.ProjectCardRenderer;
 import site.muyin.portfolio.content.ProjectContentRenderer;
 import site.muyin.portfolio.query.ProjectQuery;
 import site.muyin.portfolio.scheme.Project;
@@ -36,16 +37,22 @@ import site.muyin.portfolio.setting.PortfolioSetting.OptionItem;
 @RequiredArgsConstructor
 public class PortfolioPageRouter {
 
+    private static final String LIST_PATH = "/portfolio";
+    private static final String DETAIL_PATH = "/portfolio/{slug}";
+    private static final String LIST_TEMPLATE = "portfolio";
+    private static final String DETAIL_TEMPLATE = "portfolio-detail";
+
     private final TemplateNameResolver templateNameResolver;
     private final PortfolioSettingService settingService;
     private final ProjectService projectService;
     private final ProjectContentRenderer contentRenderer;
+    private final ProjectCardRenderer projectCardRenderer;
 
     @Bean
     RouterFunction<ServerResponse> portfolioPageRouterFunction() {
         return RouterFunctions.route()
-            .GET("/projects", this::listPage)
-            .GET("/projects/{slug}", this::detailPage)
+            .GET(LIST_PATH, this::listPage)
+            .GET(DETAIL_PATH, this::detailPage)
             .build();
     }
 
@@ -60,7 +67,7 @@ public class PortfolioPageRouter {
                 var query = new ProjectQuery(request.exchange());
                 return projectService.list(ProjectServiceImpl.publishedListOptions(query),
                         PageRequestImpl.of(page, size, ProjectQuery.defaultSort()))
-                    .flatMap(projects -> render(request, "projects", pageModel(setting, projects, size)));
+                    .flatMap(projects -> render(request, LIST_TEMPLATE, pageModel(setting, projects, size)));
             });
     }
 
@@ -70,15 +77,15 @@ public class PortfolioPageRouter {
             .switchIfEmpty(Mono.error(new ResponseStatusException(HttpStatus.NOT_FOUND)))
             .flatMap(setting -> projectService.getPublishedBySlug(request.pathVariable("slug"))
                 .switchIfEmpty(Mono.error(new ResponseStatusException(HttpStatus.NOT_FOUND, "项目不存在")))
-                .flatMap(project -> {
+                .flatMap(project -> renderProjectContent(project).flatMap(projectContentHtml -> {
                     var model = new HashMap<String, Object>();
                     model.put("title", project.getTitle() + " - " + setting.getSeoTitle());
                     model.put("description", project.getSummary() == null ? setting.getSeoDescription() : project.getSummary());
                     model.put("project", project);
-                    model.put("projectContentHtml", contentRenderer.renderMarkdown(detailContent(project)));
+                    model.put("projectContentHtml", projectContentHtml);
                     addOptionLabels(model, setting);
-                    return render(request, "project-detail", model);
-                }));
+                    return render(request, DETAIL_TEMPLATE, model);
+                })));
     }
 
     private Map<String, Object> pageModel(PortfolioSetting setting, Object projects, int size) {
@@ -126,6 +133,10 @@ public class PortfolioPageRouter {
 
     private String detailContent(Project project) {
         return StringUtils.hasText(project.getContent()) ? project.getContent() : project.getSummary();
+    }
+
+    private Mono<String> renderProjectContent(Project project) {
+        return projectCardRenderer.render(contentRenderer.renderMarkdown(detailContent(project)));
     }
 
     private boolean isDefaultPageEnabled(PortfolioSetting setting) {

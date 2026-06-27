@@ -11,7 +11,7 @@ spec:
           name: defaultPageEnabled
           key: defaultPageEnabled
           label: 启用默认展示页
-          help: 开启后插件提供 /projects 和 /projects/{slug} 默认页面；主题也可以通过 Finder API 自行渲染。
+          help: 开启后插件提供 /portfolio 和 /portfolio/{slug} 默认页面；主题也可以通过 Finder API 自行渲染。
           value: true
         - $formkit: number
           name: pageSize

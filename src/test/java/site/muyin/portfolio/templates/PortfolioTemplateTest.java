@@ -29,14 +29,14 @@ class PortfolioTemplateTest {
             .setFeatured(false)
             .setTechStacks(List.of("Java"));
 
-        var listHtml = render("projects", Map.of(
+        var listHtml = render("portfolio", Map.of(
             "title", "项目作品集",
             "description", "集中展示项目",
             "projects", new ProjectsModel(List.of(project)),
             "platformLabels", Map.of("github", "GitHub"),
             "typeLabels", Map.of("plugin", "插件")
         ));
-        var detailHtml = render("project-detail", Map.of(
+        var detailHtml = render("portfolio-detail", Map.of(
             "title", "Halo Portfolio - 项目作品集",
             "description", "集中展示项目",
             "project", project,
@@ -46,7 +46,9 @@ class PortfolioTemplateTest {
         ));
 
         assertThat(listHtml).contains("GitHub", "插件");
+        assertThat(listHtml).contains("href=\"/portfolio/halo-portfolio\"");
         assertThat(detailHtml).contains("GitHub", "插件");
+        assertThat(detailHtml).contains("href=\"/portfolio\"");
         assertThat(detailHtml)
             .contains("<h2>详情</h2>", "<strong>Markdown</strong>")
             .doesNotContain("&lt;h2&gt;详情&lt;/h2&gt;");

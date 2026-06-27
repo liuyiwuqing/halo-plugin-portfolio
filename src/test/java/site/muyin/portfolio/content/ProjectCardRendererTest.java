@@ -49,7 +49,7 @@ class ProjectCardRendererTest {
 
         assertThat(rendered)
             .contains("data-portfolio-rendered-project-card")
-            .contains("href=\"/projects/halo-portfolio\"")
+            .contains("href=\"/portfolio/halo-portfolio\"")
             .contains("&lt;Halo Portfolio&gt;")
             .contains("集中展示 &quot;项目&quot; &amp; 插件")
             .contains("github", "plugin")

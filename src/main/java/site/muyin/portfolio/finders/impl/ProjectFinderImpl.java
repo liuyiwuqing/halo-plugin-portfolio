@@ -11,6 +11,7 @@ import run.halo.app.extension.ListResult;
 import run.halo.app.extension.PageRequestImpl;
 import run.halo.app.extension.index.query.Queries;
 import run.halo.app.theme.finders.Finder;
+import site.muyin.portfolio.content.ProjectCardRenderer;
 import site.muyin.portfolio.content.ProjectContentRenderer;
 import site.muyin.portfolio.enums.ProjectStatus;
 import site.muyin.portfolio.finders.ProjectFinder;
@@ -38,12 +39,14 @@ public class ProjectFinderImpl implements ProjectFinder {
     private final ProjectService projectService;
     private final PortfolioSettingService settingService;
     private final ProjectContentRenderer contentRenderer;
+    private final ProjectCardRenderer projectCardRenderer;
 
     public ProjectFinderImpl(ProjectService projectService, PortfolioSettingService settingService,
-        ProjectContentRenderer contentRenderer) {
+        ProjectContentRenderer contentRenderer, ProjectCardRenderer projectCardRenderer) {
         this.projectService = projectService;
         this.settingService = settingService;
         this.contentRenderer = contentRenderer;
+        this.projectCardRenderer = projectCardRenderer;
     }
 
     @Override
@@ -149,7 +152,8 @@ public class ProjectFinderImpl implements ProjectFinder {
             return "";
         }
         var content = hasText(project.getContent()) ? project.getContent() : project.getSummary();
-        return contentRenderer.renderMarkdown(content);
+        var rendered = projectCardRenderer.render(contentRenderer.renderMarkdown(content)).block();
+        return rendered == null ? "" : rendered;
     }
 
     @Override
