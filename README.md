@@ -6,6 +6,12 @@
 
 > Halo CMS 插件 —— 统一管理和展示 GitHub、Gitee、产品、插件、工具等项目作品。
 
+## 功能体验
+
+| 地址                       | 账号/密码                     |
+| ------------------------- | ---------------------------  |
+| [管理端](https://demo.muyin.site/console/portfolio) | demo/demo123. |
+
 ## 交流群
 
 [点击链接加入群聊【halo博客-lywq插件】](https://qm.qq.com/q/wuC7NZr0sw)
