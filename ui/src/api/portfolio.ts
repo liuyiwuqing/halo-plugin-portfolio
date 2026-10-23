@@ -15,6 +15,7 @@ const consolePortfolioApi = new ConsolePortfolioMuyinSiteV1alpha1PortfolioApi(
 )
 
 export type { Project, ProjectList }
+export type { RepositorySnapshot } from './generated'
 export type ProjectStatus = ProjectStatusEnum
 
 export type ProjectQuery = ConsolePortfolioMuyinSiteV1alpha1PortfolioApiProjectListForConsoleRequest
@@ -34,6 +35,11 @@ export const portfolioApi = {
   create: (project: Project) => consolePortfolioApi.projectCreateForConsole({ project }),
   update: (project: Project) => consolePortfolioApi.projectUpdateForConsole({ project }),
   delete: (slug: string) => consolePortfolioApi.projectDeleteForConsole({ slug }),
+  repositoryPreview: (repoUrl: string) =>
+    consolePortfolioApi.repositoryPreviewForConsole({ repositoryRequest: { repoUrl } }),
+  importRepository: (repoUrl: string) =>
+    consolePortfolioApi.repositoryImportForConsole({ repositoryRequest: { repoUrl } }),
+  syncRepository: (slug: string) => consolePortfolioApi.repositorySyncForConsole({ slug }),
   options: () =>
     consolePortfolioApi.projectOptionsForConsole() as unknown as Promise<
       AxiosResponse<ProjectOptions>

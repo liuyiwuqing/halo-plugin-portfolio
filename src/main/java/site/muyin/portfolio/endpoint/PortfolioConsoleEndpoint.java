@@ -9,6 +9,7 @@ import org.springframework.web.reactive.function.server.ServerResponse;
 import run.halo.app.core.extension.endpoint.CustomEndpoint;
 import run.halo.app.extension.GroupVersion;
 import site.muyin.portfolio.endpoint.routes.ProjectRoutes;
+import site.muyin.portfolio.endpoint.routes.RepositoryRoutes;
 
 /**
  * 作品集控制台接口。
@@ -24,11 +25,12 @@ public class PortfolioConsoleEndpoint implements CustomEndpoint {
     public static final String CONSOLE_TAG = CONSOLE_GROUP_VERSION + "/Portfolio";
 
     private final ProjectRoutes projectRoutes;
+    private final RepositoryRoutes repositoryRoutes;
 
     @Override
     public RouterFunction<ServerResponse> endpoint() {
         return SpringdocRouteBuilder.route()
-            .nest(RequestPredicates.path("projects"), projectRoutes::consoleRoutes)
+            .nest(RequestPredicates.path("projects"), () -> projectRoutes.consoleRoutes().and(repositoryRoutes.routes()))
             .build();
     }
 

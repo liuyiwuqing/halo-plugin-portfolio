@@ -180,6 +180,21 @@
             max-width: 100%;
             border-radius: 8px;
         }
+
+        .repository-snapshot { margin: 24px 0; padding: 18px; border: 1px solid var(--portfolio-line); border-radius: 6px; }
+        .repository-snapshot h2 { margin: 0 0 12px; font-size: 18px; }
+        .repository-snapshot dl { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 24px; margin: 0; }
+        .repository-snapshot dt { color: var(--portfolio-muted); font-size: 12px; }
+        .repository-snapshot dd { margin: 2px 0 0; overflow-wrap: anywhere; }
+        .repository-snapshot p { margin: 16px 0 0; color: var(--portfolio-muted); font-size: 12px; }
+        a:focus-visible { outline: 3px solid #2dd4bf; outline-offset: 3px; }
+        a.chip:hover { background: #d8eeeb; }
+        .content, h1, .summary { overflow-wrap: anywhere; }
+        @media (max-width: 640px) {
+            .portfolio-detail { padding: 24px 16px 40px; }
+            .portfolio-article { padding: 18px; }
+            h1 { font-size: 28px; }
+        }
     </style>
 </head>
 <body>
@@ -198,7 +213,12 @@
         <h1 th:text="${project.title}">项目标题</h1>
         <p class="summary" th:text="${project.summary}">项目摘要</p>
         <div class="meta" th:if="${project.techStacks != null && !project.techStacks.isEmpty()}">
-            <span class="chip" th:each="stack : ${project.techStacks}" th:text="${stack}">Java</span>
+            <a class="chip" th:each="stack : ${project.techStacks}" th:text="${stack}"
+               th:href="@{/portfolio(tag=${stack})}">Java</a>
+        </div>
+        <div class="meta" th:if="${project.tags != null && !project.tags.isEmpty()}">
+            <a class="chip" th:each="tag : ${project.tags}" th:text="|# ${tag}|"
+               th:href="@{/portfolio(tag=${tag})}"># 工具</a>
         </div>
         <div class="actions">
             <a th:if="${project.repoUrl != null && !project.repoUrl.isEmpty()}" th:href="${project.repoUrl}" target="_blank"
@@ -208,6 +228,17 @@
             <a th:if="${project.docsUrl != null && !project.docsUrl.isEmpty()}" th:href="${project.docsUrl}" target="_blank"
                rel="noopener">项目文档</a>
         </div>
+        <section class="repository-snapshot" th:if="${project.repository != null}" aria-label="仓库信息">
+            <h2>仓库信息</h2>
+            <dl>
+                <div><dt>关注</dt><dd th:text="|${project.repository.stars} Stars / ${project.repository.forks} Forks|">0 Stars / 0 Forks</dd></div>
+                <div><dt>维护状态</dt><dd th:text="${project.repository.archived ? '已归档' : '未归档'}">未归档</dd></div>
+                <div th:if="${project.repository.language != null}"><dt>主要语言</dt><dd th:text="${project.repository.language}">Java</dd></div>
+                <div th:if="${project.repository.license != null}"><dt>开源协议</dt><dd th:text="${project.repository.license}">MIT</dd></div>
+                <div th:if="${project.repository.pushedAt != null}"><dt>最近推送</dt><dd th:text="${project.repository.pushedAt}">—</dd></div>
+            </dl>
+            <p>以上为同步快照，并非实时数据。<span th:if="${project.repository.syncedAt != null}" th:text="|同步时间：${project.repository.syncedAt}|">同步时间</span></p>
+        </section>
         <div class="content" th:utext="${projectContentHtml}">项目详情</div>
     </article>
 </main>

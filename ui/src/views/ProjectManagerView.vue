@@ -11,7 +11,7 @@ import {
   VPagination,
   VSpace,
 } from '@halo-dev/components'
-import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import RiAddLine from '~icons/ri/add-line'
 import RiCodeBoxLine from '~icons/ri/code-box-line'
 import RiDeleteBinLine from '~icons/ri/delete-bin-line'
@@ -33,6 +33,10 @@ import {
   type ProjectStatus,
 } from '@/api/portfolio'
 
+import { useProjectList } from '@/composables/useProjectList'
+import { repositoryErrorMessage } from '@/composables/useRepositoryImport'
+import RepositoryImportModal from '@/components/RepositoryImportModal.vue'
+
 const PROJECT_API_VERSION = 'portfolio.muyin.site/v1alpha1'
 const PROJECT_KIND = 'Project'
 
@@ -45,48 +49,36 @@ const statusOptions: Array<{ label: string; value: ProjectStatus | '' }> = [
   { label: '已归档', value: 'archived' },
 ]
 
-const loading = ref(false)
+const {
+  projects,
+  total,
+  page,
+  size,
+  loading,
+  error: listError,
+  filters,
+  refresh: fetchProjects,
+  search,
+  resetFilters: clearFilters,
+} = useProjectList(portfolioApi.list)
+const searchKeyword = ref('')
+const searchTag = ref('')
+const saving = ref(false)
+const importVisible = ref(false)
+const syncing = ref(new Set<string>())
+const syncErrors = ref<Record<string, string>>({})
+const optionsError = ref(false)
 const optionsLoading = ref(false)
 const modalVisible = ref(false)
 const coverPickerVisible = ref(false)
 const editing = ref(false)
-const projects = ref<Project[]>([])
 const projectOptions = ref<ProjectOptions>({
   platformOptions: [],
   typeOptions: [],
 })
-const total = ref(0)
-const page = ref(1)
-const size = ref(12)
 const viewMode = ref<'grid' | 'list'>('grid')
 
-const filters = reactive({
-  keyword: '',
-  platform: '',
-  type: '',
-  status: '' as ProjectStatus | '',
-})
-
-const form = reactive<ProjectForm>({
-  title: '',
-  slug: '',
-  summary: '',
-  content: '',
-  cover: '',
-  platform: '',
-  type: '',
-  techStacks: [],
-  tags: [],
-  repoUrl: '',
-  demoUrl: '',
-  docsUrl: '',
-  sourceProvider: '',
-  repoOwner: '',
-  repoName: '',
-  priority: 0,
-  featured: false,
-  status: 'draft',
-})
+const form = ref<ProjectForm>({ title: '', slug: '' })
 
 const techStacksText = ref('')
 const tagsText = ref('')
@@ -94,7 +86,8 @@ const tagsText = ref('')
 const hasProjects = computed(() => projects.value.length > 0)
 const platformOptions = computed(() => projectOptions.value.platformOptions || [])
 const typeOptions = computed(() => projectOptions.value.typeOptions || [])
-const isEmpty = computed(() => !loading.value && !hasProjects.value)
+const isEmpty = computed(() => !loading.value && !listError.value && !hasProjects.value)
+const editStatusOptions = computed(() => statusOptions.filter((item) => item.value))
 
 function optionLabel(options: OptionItem[], value?: string) {
   return options.find((item) => item.value === value)?.label || '其他'
@@ -136,7 +129,7 @@ function handleCoverSelect(attachments: AttachmentLike[]) {
     return
   }
 
-  form.cover = items[0].url || ''
+  form.value.cover = items[0].url || ''
   coverPickerVisible.value = false
 }
 
@@ -164,20 +157,22 @@ function createProjectForm(): ProjectForm {
 }
 
 function resetForm() {
-  Object.assign(form, createProjectForm())
+  form.value = createProjectForm()
   techStacksText.value = ''
   tagsText.value = ''
 }
 
 function openCreateModal() {
+  if (saving.value) return
   editing.value = false
   resetForm()
   modalVisible.value = true
 }
 
 function openEditModal(project: Project) {
+  if (saving.value) return
   editing.value = true
-  Object.assign(form, createProjectForm(), JSON.parse(JSON.stringify(project)))
+  form.value = { ...createProjectForm(), ...JSON.parse(JSON.stringify(project)) }
   techStacksText.value = project.techStacks?.join(', ') || ''
   tagsText.value = project.tags?.join(', ') || ''
   modalVisible.value = true
@@ -191,11 +186,11 @@ function splitText(value: string) {
 }
 
 function validateForm() {
-  if (!form.title?.trim()) {
+  if (!form.value.title?.trim()) {
     Toast.warning('请输入项目标题')
     return false
   }
-  if (!form.slug?.trim()) {
+  if (!form.value.slug?.trim()) {
     Toast.warning('请输入项目 slug')
     return false
   }
@@ -203,79 +198,66 @@ function validateForm() {
 }
 
 function buildProjectPayload(): Project {
-  const slug = form.slug.trim()
+  const slug = form.value.slug.trim()
   return {
-    apiVersion: form.apiVersion || PROJECT_API_VERSION,
-    kind: form.kind || PROJECT_KIND,
+    apiVersion: form.value.apiVersion || PROJECT_API_VERSION,
+    kind: form.value.kind || PROJECT_KIND,
     metadata: {
-      ...form.metadata,
-      name: form.metadata?.name || `project-${slug}`,
+      ...form.value.metadata,
+      name: form.value.metadata?.name || `project-${slug}`,
     },
-    title: form.title.trim(),
+    title: form.value.title.trim(),
     slug,
-    summary: form.summary,
-    content: form.content,
-    cover: form.cover,
-    platform: form.platform,
-    type: form.type,
+    summary: form.value.summary,
+    content: form.value.content,
+    cover: form.value.cover,
+    platform: form.value.platform,
+    type: form.value.type,
     techStacks: splitText(techStacksText.value),
     tags: splitText(tagsText.value),
-    repoUrl: form.repoUrl,
-    demoUrl: form.demoUrl,
-    docsUrl: form.docsUrl,
-    sourceProvider: form.sourceProvider,
-    repoOwner: form.repoOwner,
-    repoName: form.repoName,
-    priority: form.priority ?? 0,
-    featured: form.featured ?? false,
-    status: form.status || 'draft',
-    createTime: form.createTime,
-    updateTime: form.updateTime,
-  }
-}
-
-async function fetchProjects() {
-  loading.value = true
-  try {
-    const { data } = await portfolioApi.list({
-      page: page.value,
-      size: size.value,
-      keyword: filters.keyword || undefined,
-      platform: filters.platform || undefined,
-      type: filters.type || undefined,
-      status: filters.status || undefined,
-    })
-    projects.value = data.items || []
-    total.value = data.total || 0
-  } finally {
-    loading.value = false
+    repoUrl: form.value.repoUrl,
+    demoUrl: form.value.demoUrl,
+    docsUrl: form.value.docsUrl,
+    sourceProvider: form.value.sourceProvider,
+    repoOwner: form.value.repoOwner,
+    repoName: form.value.repoName,
+    priority: form.value.priority ?? 0,
+    featured: form.value.featured ?? false,
+    status: form.value.status || 'draft',
+    createTime: form.value.createTime,
+    updateTime: form.value.updateTime,
   }
 }
 
 async function fetchOptions() {
   optionsLoading.value = true
+  optionsError.value = false
   try {
     const { data } = await portfolioApi.options()
     projectOptions.value = {
       platformOptions: data.platformOptions || [],
       typeOptions: data.typeOptions || [],
     }
-    if (!form.platform) {
-      form.platform = data.platformOptions?.[0]?.value || 'other'
+    if (!form.value.platform) {
+      form.value.platform = data.platformOptions?.[0]?.value || 'other'
     }
-    if (!form.type) {
-      form.type = data.typeOptions?.[0]?.value || 'other'
+    if (!form.value.type) {
+      form.value.type = data.typeOptions?.[0]?.value || 'other'
     }
+  } catch {
+    optionsError.value = true
   } finally {
     optionsLoading.value = false
   }
 }
 
 async function submitForm() {
-  if (!validateForm()) return
+  if (saving.value || !validateForm()) return
+  saving.value = true
+  const isEditing = editing.value
   const payload = buildProjectPayload()
   try {
-    if (editing.value) {
+    if (isEditing) {
       await portfolioApi.update(payload)
       Toast.success('更新成功')
     } else {
@@ -283,10 +265,11 @@ async function submitForm() {
       Toast.success('创建成功')
     }
     modalVisible.value = false
-    await fetchProjects()
-  } catch (error) {
-    Toast.error(editing.value ? '更新失败' : '创建失败')
-    throw error
+    await fetchProjects(true)
+  } catch {
+    Toast.error(isEditing ? '更新失败，请重试' : '创建失败，请重试')
+  } finally {
+    saving.value = false
   }
 }
 
@@ -301,33 +284,69 @@ function deleteProject(project: Project) {
     onConfirm: async () => {
       await portfolioApi.delete(project.slug)
       Toast.success('删除成功')
-      await fetchProjects()
+      await fetchProjects(true)
     },
   })
 }
 
 function resetFilters() {
-  filters.keyword = ''
-  filters.platform = ''
-  filters.type = ''
-  filters.status = ''
-  page.value = 1
-  fetchProjects()
+  searchKeyword.value = ''
+  searchTag.value = ''
+  clearFilters()
+}
+
+function submitSearch() {
+  search(searchKeyword.value, searchTag.value)
+}
+
+function filterByTag(tag: string) {
+  searchTag.value = tag
+  submitSearch()
+}
+
+function canSync(project: Project) {
+  try {
+    const url = new URL(project.repoUrl || '')
+    return ['github.com', 'gitee.com'].includes(url.hostname) && url.protocol === 'https:'
+  } catch {
+    return false
+  }
+}
+
+function syncTime(value: string) {
+  const date = new Date(value)
+  return Number.isNaN(date.getTime()) ? '时间未知' : date.toLocaleString('zh-CN')
+}
+
+async function syncRepository(project: Project) {
+  if (syncing.value.has(project.slug)) return
+  syncing.value.add(project.slug)
+  delete syncErrors.value[project.slug]
+  try {
+    await portfolioApi.syncRepository(project.slug)
+    Toast.success('仓库数据已同步，手工编辑的内容已保留')
+    await fetchProjects(true)
+  } catch (cause) {
+    syncErrors.value[project.slug] = repositoryErrorMessage(cause)
+  } finally {
+    syncing.value.delete(project.slug)
+  }
+}
+
+async function handleImported(project: Project) {
+  await fetchProjects(true)
+  openEditModal(project)
 }
 
 function handleRouteToFront() {
-  window.open('/portfolio', '_blank')
+  window.open('/portfolio', '_blank', 'noopener,noreferrer')
 }
 
-watch([() => filters.status, () => filters.platform, () => filters.type], () => {
-  page.value = 1
-  fetchProjects()
-})
+function preventCloseWhileSaving(event: KeyboardEvent) {
+  if (saving.value && event.key === 'Escape') event.stopImmediatePropagation()
+}
 
-onMounted(async () => {
-  await fetchOptions()
-  await fetchProjects()
-})
+onMounted(fetchOptions)
 </script>
 
 <template>
@@ -342,6 +361,15 @@ onMounted(async () => {
           <span>查看前台</span>
         </button>
         <VButton
+          v-permission="['plugin:portfolio:project:manage']"
+          type="secondary"
+          size="sm"
+          @click="importVisible = true"
+        >
+          从仓库导入
+        </VButton>
+        <VButton
+          v-permission="['plugin:portfolio:project:manage']"
           type="primary"
           size="sm"
           class="portfolio-header-primary-button"
@@ -357,17 +385,25 @@ onMounted(async () => {
   </VPageHeader>
 
   <div class="portfolio-manager-container">
+    <div v-if="optionsError" class="portfolio-options-error" role="alert">
+      分类选项加载失败。
+      <VButton type="secondary" size="sm" :loading="optionsLoading" @click="fetchOptions"
+        >重试</VButton
+      >
+    </div>
     <!-- 状态页签 -->
     <div class="portfolio-status-tabs">
-      <div
+      <button
         v-for="option in statusOptions"
         :key="option.value"
+        type="button"
         class="status-tab-item"
+        :aria-pressed="filters.status === option.value"
         :class="{ active: filters.status === option.value }"
         @click="filters.status = option.value"
       >
         {{ option.label }}
-      </div>
+      </button>
     </div>
 
     <VCard class="portfolio-project-card" :body-class="['!p-0']">
@@ -377,10 +413,11 @@ onMounted(async () => {
             <div class="search-input-wrapper">
               <RiSearchLine class="search-icon" />
               <input
-                v-model="filters.keyword"
+                v-model="searchKeyword"
                 type="text"
                 placeholder="搜索项目..."
-                @keyup.enter="fetchProjects"
+                aria-label="搜索项目"
+                @keyup.enter="submitSearch"
               />
             </div>
           </div>
@@ -389,7 +426,7 @@ onMounted(async () => {
               <div class="filter-dropdown-group">
                 <div class="filter-select-wrapper">
                   <RiFilter3Line class="filter-icon" />
-                  <select v-model="filters.platform">
+                  <select v-model="filters.platform" aria-label="筛选平台">
                     <option value="">所有平台</option>
                     <option v-for="item in platformOptions" :key="item.value" :value="item.value">
                       {{ item.label }}
@@ -397,7 +434,7 @@ onMounted(async () => {
                   </select>
                 </div>
                 <div class="filter-select-wrapper">
-                  <select v-model="filters.type">
+                  <select v-model="filters.type" aria-label="筛选类型">
                     <option value="">所有类型</option>
                     <option v-for="item in typeOptions" :key="item.value" :value="item.value">
                       {{ item.label }}
@@ -430,17 +467,53 @@ onMounted(async () => {
                 class="toolbar-icon-button is-refresh"
                 title="刷新数据"
                 aria-label="刷新项目列表"
-                @click="fetchProjects"
+                @click="fetchProjects()"
               >
                 <RiRefreshLine :class="{ 'animate-spin': loading }" />
               </button>
             </VSpace>
           </div>
         </div>
+        <div class="portfolio-extra-filters">
+          <div class="search-input-wrapper">
+            <input
+              v-model="searchTag"
+              aria-label="筛选标签或技术栈"
+              placeholder="标签或技术栈"
+              @keyup.enter="submitSearch"
+            />
+          </div>
+          <VButton type="default" class="portfolio-filter-button" @click="submitSearch"
+            >搜索</VButton
+          >
+          <div class="filter-select-wrapper">
+            <select v-model="filters.featured" aria-label="筛选推荐项目">
+              <option value="">全部推荐状态</option>
+              <option value="true">已推荐</option>
+              <option value="false">未推荐</option>
+            </select>
+          </div>
+          <div class="filter-select-wrapper">
+            <select v-model="filters.sort" aria-label="项目排序">
+              <option value="">默认排序</option>
+              <option value="metadata.creationTimestamp,desc">最新创建</option>
+              <option value="metadata.creationTimestamp,asc">最早创建</option>
+            </select>
+          </div>
+          <VButton type="default" class="portfolio-filter-button" @click="resetFilters"
+            >重置筛选</VButton
+          >
+        </div>
       </template>
 
       <div class="portfolio-content-area">
         <VLoading v-if="loading" class="py-20" />
+
+        <VEmpty v-else-if="listError" title="加载失败" :message="listError">
+          <template #actions>
+            <VButton type="secondary" @click="fetchProjects()">重试</VButton>
+          </template>
+        </VEmpty>
 
         <VEmpty
           v-else-if="isEmpty"
@@ -476,6 +549,7 @@ onMounted(async () => {
                 <div class="project-overlay-actions">
                   <button
                     type="button"
+                    v-permission="['plugin:portfolio:project:manage']"
                     class="project-overlay-action is-edit"
                     :aria-label="`编辑 ${project.title || '项目'}`"
                     @click="openEditModal(project)"
@@ -485,6 +559,7 @@ onMounted(async () => {
                   </button>
                   <button
                     type="button"
+                    v-permission="['plugin:portfolio:project:manage']"
                     class="project-overlay-action is-danger"
                     :aria-label="`删除 ${project.title || '项目'}`"
                     @click="deleteProject(project)"
@@ -520,6 +595,34 @@ onMounted(async () => {
                 </p>
               </div>
 
+              <div v-if="canSync(project) || project.repository" class="project-repository-meta">
+                <div v-if="project.repository" class="repository-statistics">
+                  <span>★ {{ project.repository.stars ?? 0 }}</span>
+                  <span>Forks {{ project.repository.forks ?? 0 }}</span>
+                  <span v-if="project.repository.language">{{ project.repository.language }}</span>
+                  <span v-if="project.repository.archived">已归档仓库</span>
+                </div>
+                <div class="repository-sync-row">
+                  <span :title="project.repository?.syncedAt">{{
+                    project.repository?.syncedAt
+                      ? '同步于 ' + syncTime(project.repository.syncedAt)
+                      : '尚未同步仓库数据'
+                  }}</span>
+                  <VButton
+                    v-if="canSync(project)"
+                    v-permission="['plugin:portfolio:project:manage']"
+                    type="secondary"
+                    size="sm"
+                    :loading="syncing.has(project.slug)"
+                    :disabled="syncing.has(project.slug)"
+                    @click="syncRepository(project)"
+                    >同步</VButton
+                  >
+                </div>
+                <p v-if="syncErrors[project.slug]" class="repository-sync-error" role="alert">
+                  {{ syncErrors[project.slug] }}
+                </p>
+              </div>
               <div v-if="viewMode === 'grid'" class="project-info-footer">
                 <div class="project-meta-line">
                   <span class="meta-tag">{{ optionLabel(platformOptions, project.platform) }}</span>
@@ -527,9 +630,16 @@ onMounted(async () => {
                   <span class="meta-tag">{{ optionLabel(typeOptions, project.type) }}</span>
                 </div>
                 <div v-if="project.techStacks?.length" class="project-stacks">
-                  <span v-for="stack in project.techStacks.slice(0, 3)" :key="stack">
+                  <button
+                    v-for="stack in project.techStacks.slice(0, 3)"
+                    :key="stack"
+                    type="button"
+                    class="stack-filter"
+                    :aria-label="`筛选技术栈 ${stack}`"
+                    @click="filterByTag(stack)"
+                  >
                     {{ stack }}
-                  </span>
+                  </button>
                   <span v-if="project.techStacks.length > 3" class="more-stacks">...</span>
                 </div>
               </div>
@@ -568,13 +678,16 @@ onMounted(async () => {
                   <div v-if="project.techStacks?.length" class="project-list-chip-row">
                     <span class="project-list-chip-label">技术栈</span>
                     <div class="project-list-chips">
-                      <span
+                      <button
                         v-for="stack in project.techStacks.slice(0, 5)"
                         :key="stack"
                         class="project-list-chip is-stack"
+                        type="button"
+                        :aria-label="`筛选 ${stack}`"
+                        @click="filterByTag(stack)"
                       >
                         {{ stack }}
-                      </span>
+                      </button>
                       <span v-if="project.techStacks.length > 5" class="project-list-chip is-more">
                         +{{ project.techStacks.length - 5 }}
                       </span>
@@ -583,13 +696,16 @@ onMounted(async () => {
                   <div v-if="project.tags?.length" class="project-list-chip-row">
                     <span class="project-list-chip-label">标签</span>
                     <div class="project-list-chips">
-                      <span
+                      <button
                         v-for="tag in project.tags.slice(0, 5)"
                         :key="tag"
                         class="project-list-chip is-tag"
+                        type="button"
+                        :aria-label="`筛选 ${tag}`"
+                        @click="filterByTag(tag)"
                       >
                         {{ tag }}
-                      </span>
+                      </button>
                       <span v-if="project.tags.length > 5" class="project-list-chip is-more">
                         +{{ project.tags.length - 5 }}
                       </span>
@@ -613,6 +729,7 @@ onMounted(async () => {
               </a>
               <button
                 type="button"
+                v-permission="['plugin:portfolio:project:manage']"
                 class="project-list-action-button is-edit"
                 @click="openEditModal(project)"
               >
@@ -621,6 +738,7 @@ onMounted(async () => {
               </button>
               <button
                 type="button"
+                v-permission="['plugin:portfolio:project:manage']"
                 class="project-list-action-button is-danger"
                 @click="deleteProject(project)"
               >
@@ -638,19 +756,33 @@ onMounted(async () => {
           v-model:size="size"
           :total="total"
           :size-options="[12, 24, 48, 96]"
-          @change="fetchProjects"
         />
       </template>
     </VCard>
   </div>
 
   <VModal
-    v-model:visible="modalVisible"
+    :visible="modalVisible"
+    :layer-closable="!saving"
+    @keyup.capture="preventCloseWhileSaving"
+    @update:visible="
+      (visible) => {
+        if (!saving) modalVisible = visible
+      }
+    "
     :title="editing ? '编辑项目' : '新增项目'"
     :width="860"
     :mount-to-body="true"
   >
-    <div class="portfolio-admin-form">
+    <template #header>
+      <div class="portfolio-modal-header">
+        <strong>{{ editing ? '编辑项目' : '新增项目' }}</strong>
+        <VButton type="secondary" size="sm" :disabled="saving" @click="modalVisible = false"
+          >关闭</VButton
+        >
+      </div>
+    </template>
+    <fieldset class="portfolio-admin-form" :disabled="saving">
       <!-- 基本信息 -->
       <div class="portfolio-admin-form-section">
         <h3 class="section-title">核心信息</h3>
@@ -687,7 +819,7 @@ onMounted(async () => {
               v-model="form.content"
               class="portfolio-admin-textarea is-content"
               rows="5"
-              placeholder="支持保存 Markdown 文本，默认页面按纯文本展示"
+              placeholder="支持 Markdown，前台详情页会渲染排版内容"
             />
           </label>
         </div>
@@ -751,7 +883,7 @@ onMounted(async () => {
           <label>
             <span>状态</span>
             <select v-model="form.status" class="portfolio-admin-select">
-              <option v-for="item in statusOptions" :key="item.value" :value="item.value">
+              <option v-for="item in editStatusOptions" :key="item.value" :value="item.value">
                 {{ item.label }}
               </option>
             </select>
@@ -826,18 +958,30 @@ onMounted(async () => {
           </label>
         </div>
       </div>
-    </div>
+    </fieldset>
     <template #footer>
       <div class="portfolio-admin-modal-actions">
-        <VButton type="secondary" @click="modalVisible = false">
+        <VButton type="secondary" :disabled="saving" @click="modalVisible = false">
           <span class="portfolio-admin-button-content">取消</span>
         </VButton>
-        <VButton type="primary" @click="submitForm">
+        <VButton
+          v-permission="['plugin:portfolio:project:manage']"
+          type="primary"
+          :loading="saving"
+          :disabled="saving"
+          @click="submitForm"
+        >
           <span class="portfolio-admin-button-content">保存</span>
         </VButton>
       </div>
     </template>
   </VModal>
+
+  <RepositoryImportModal
+    v-if="importVisible"
+    @close="importVisible = false"
+    @imported="handleImported"
+  />
 
   <AttachmentSelectorModal
     v-if="coverPickerVisible"
@@ -850,6 +994,77 @@ onMounted(async () => {
 </template>
 
 <style scoped lang="scss">
+.portfolio-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+}
+.portfolio-extra-filters {
+  display: flex;
+  flex: 1 1 100%;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding: 0 1.25rem 1rem;
+  align-items: center;
+}
+.portfolio-project-card :deep(.card-header) {
+  flex-wrap: wrap;
+}
+.portfolio-extra-filters .search-input-wrapper {
+  max-width: 220px;
+}
+.portfolio-filter-button {
+  height: 2.25rem;
+  padding: 0 0.875rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.875rem;
+}
+.portfolio-options-error {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  margin-bottom: 1rem;
+  color: #b42318;
+}
+.project-repository-meta {
+  margin-top: 0.75rem;
+  font-size: 0.75rem;
+  color: #667085;
+}
+.repository-statistics,
+.repository-sync-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.625rem;
+}
+.repository-sync-row {
+  margin-top: 0.5rem;
+  justify-content: space-between;
+}
+.repository-sync-error {
+  color: #b42318;
+  margin-top: 0.5rem;
+}
+.stack-filter {
+  border: none;
+  border-radius: 4px;
+  background: #f2f4f7;
+  padding: 2px 6px;
+  font: inherit;
+  cursor: pointer;
+}
+button.project-list-chip {
+  cursor: pointer;
+}
+fieldset.portfolio-admin-form {
+  border: none;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+
 .portfolio-header-action-button {
   display: inline-flex;
   align-items: center;
@@ -954,6 +1169,8 @@ onMounted(async () => {
 }
 
 .status-tab-item {
+  border: none;
+  background: transparent;
   position: relative;
   padding: 0.75rem 0.25rem;
   color: var(--portfolio-muted);
@@ -1043,6 +1260,7 @@ onMounted(async () => {
 
 .filter-dropdown-group {
   display: flex;
+  flex-wrap: wrap;
   gap: 0.5rem;
 }
 

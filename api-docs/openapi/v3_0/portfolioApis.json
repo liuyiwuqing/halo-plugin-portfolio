@@ -2,7 +2,7 @@
   "openapi" : "3.0.1",
   "info" : {
     "title" : "Halo",
-    "version" : "2.25.0"
+    "version" : "2.25.4"
   },
   "servers" : [ {
     "url" : "http://127.0.0.1:8090",
@@ -150,11 +150,80 @@
         "tags" : [ "console.portfolio.muyin.site/v1alpha1/Portfolio" ]
       }
     },
+    "/apis/console.portfolio.muyin.site/v1alpha1/projects/repository/import" : {
+      "post" : {
+        "description" : "将公开仓库导入为草稿",
+        "operationId" : "repository-import-for-console",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/RepositoryRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "default" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Project"
+                }
+              }
+            },
+            "description" : "default response"
+          }
+        },
+        "tags" : [ "console.portfolio.muyin.site/v1alpha1/Portfolio" ]
+      }
+    },
+    "/apis/console.portfolio.muyin.site/v1alpha1/projects/repository/preview" : {
+      "post" : {
+        "description" : "预览公开仓库元数据",
+        "operationId" : "repository-preview-for-console",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/RepositoryRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "default" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/RepositorySnapshot"
+                }
+              }
+            },
+            "description" : "default response"
+          }
+        },
+        "tags" : [ "console.portfolio.muyin.site/v1alpha1/Portfolio" ]
+      }
+    },
     "/apis/console.portfolio.muyin.site/v1alpha1/projects/settings/options" : {
       "get" : {
         "description" : "获取项目配置选项",
         "operationId" : "project-options-for-console",
-        "responses" : { },
+        "responses" : {
+          "default" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProjectOptions"
+                }
+              }
+            },
+            "description" : "default response"
+          }
+        },
         "tags" : [ "console.portfolio.muyin.site/v1alpha1/Portfolio" ]
       }
     },
@@ -221,6 +290,33 @@
         "operationId" : "project-delete-for-console",
         "parameters" : [ {
           "description" : "项目 slug",
+          "in" : "path",
+          "name" : "slug",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "default" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Project"
+                }
+              }
+            },
+            "description" : "default response"
+          }
+        },
+        "tags" : [ "console.portfolio.muyin.site/v1alpha1/Portfolio" ]
+      }
+    },
+    "/apis/console.portfolio.muyin.site/v1alpha1/projects/{slug}/sync" : {
+      "post" : {
+        "description" : "同步公开仓库快照，保留人工维护的项目内容",
+        "operationId" : "repository-sync-for-console",
+        "parameters" : [ {
           "in" : "path",
           "name" : "slug",
           "required" : true,
@@ -630,6 +726,17 @@
           }
         }
       },
+      "OptionItem" : {
+        "type" : "object",
+        "properties" : {
+          "label" : {
+            "type" : "string"
+          },
+          "value" : {
+            "type" : "string"
+          }
+        }
+      },
       "Project" : {
         "required" : [ "apiVersion", "kind", "metadata", "slug", "title" ],
         "type" : "object",
@@ -678,15 +785,18 @@
           },
           "repoName" : {
             "type" : "string",
-            "description" : "仓库名称，为后续同步预留"
+            "description" : "仓库名称"
           },
           "repoOwner" : {
             "type" : "string",
-            "description" : "仓库所有者，为后续同步预留"
+            "description" : "仓库所有者"
           },
           "repoUrl" : {
             "type" : "string",
             "description" : "仓库地址"
+          },
+          "repository" : {
+            "$ref" : "#/components/schemas/RepositorySnapshot"
           },
           "slug" : {
             "maxLength" : 80,
@@ -695,7 +805,7 @@
           },
           "sourceProvider" : {
             "type" : "string",
-            "description" : "来源提供方，为后续同步预留"
+            "description" : "来源提供方"
           },
           "status" : {
             "type" : "string",
@@ -787,6 +897,23 @@
           }
         }
       },
+      "ProjectOptions" : {
+        "type" : "object",
+        "properties" : {
+          "platformOptions" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/OptionItem"
+            }
+          },
+          "typeOptions" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/OptionItem"
+            }
+          }
+        }
+      },
       "RemoveOperation" : {
         "required" : [ "op", "path" ],
         "type" : "object",
@@ -821,6 +948,87 @@
             "description" : "Value can be any JSON value"
           }
         }
+      },
+      "RepositoryRequest" : {
+        "required" : [ "repoUrl" ],
+        "type" : "object",
+        "properties" : {
+          "repoUrl" : {
+            "type" : "string",
+            "description" : "公开 GitHub 或 Gitee 仓库的 HTTPS 地址"
+          }
+        }
+      },
+      "RepositorySnapshot" : {
+        "type" : "object",
+        "properties" : {
+          "archived" : {
+            "type" : "boolean"
+          },
+          "defaultBranch" : {
+            "type" : "string"
+          },
+          "description" : {
+            "type" : "string"
+          },
+          "forks" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "homepage" : {
+            "type" : "string"
+          },
+          "language" : {
+            "type" : "string"
+          },
+          "license" : {
+            "type" : "string"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "openIssues" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "owner" : {
+            "type" : "string"
+          },
+          "provider" : {
+            "type" : "string"
+          },
+          "pushedAt" : {
+            "type" : "string"
+          },
+          "readme" : {
+            "type" : "string",
+            "description" : "README 原始 Markdown 内容"
+          },
+          "readmeUrl" : {
+            "type" : "string",
+            "description" : "README 文档地址"
+          },
+          "stars" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "suggestedSlug" : {
+            "type" : "string"
+          },
+          "syncedAt" : {
+            "type" : "string"
+          },
+          "topics" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          },
+          "url" : {
+            "type" : "string"
+          }
+        },
+        "description" : "公开仓库元数据；手动同步不会覆盖项目介绍"
       },
       "TestOperation" : {
         "required" : [ "op", "path", "value" ],

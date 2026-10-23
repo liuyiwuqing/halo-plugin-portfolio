@@ -10,6 +10,7 @@ import lombok.experimental.Accessors;
 import run.halo.app.extension.AbstractExtension;
 import run.halo.app.extension.GVK;
 import site.muyin.portfolio.enums.ProjectStatus;
+import site.muyin.portfolio.model.RepositorySnapshot;
 
 /**
  * 作品集项目。
@@ -64,14 +65,17 @@ public class Project extends AbstractExtension {
     @Schema(description = "文档地址")
     private String docsUrl;
 
-    @Schema(description = "来源提供方，为后续同步预留")
+    @Schema(description = "来源提供方")
     private String sourceProvider;
 
-    @Schema(description = "仓库所有者，为后续同步预留")
+    @Schema(description = "仓库所有者")
     private String repoOwner;
 
-    @Schema(description = "仓库名称，为后续同步预留")
+    @Schema(description = "仓库名称")
     private String repoName;
+
+    @Schema(description = "公开仓库同步快照，与人工维护的项目内容相互独立")
+    private RepositorySnapshot repository;
 
     @Schema(description = "排序值，越大越靠前")
     private Integer priority;

@@ -5,8 +5,11 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
+import org.mockito.ArgumentCaptor;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.core.io.buffer.DefaultDataBufferFactory;
 import org.springframework.http.MediaType;
@@ -33,6 +36,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
 class PortfolioPageRouterTest {
@@ -79,6 +83,87 @@ class PortfolioPageRouterTest {
             .expectStatus().isOk()
             .expectBody(String.class)
             .isEqualTo("GitHub|插件");
+    }
+
+    @Test
+    void listPageKeepsFiltersInPaginationAndUsesStableUpdatedSort() {
+        var setting = new PortfolioSetting();
+        when(settingService.getGeneralSetting()).thenReturn(Mono.just(setting));
+        when(templateNameResolver.resolveTemplateNameOrDefault(any(), eq("portfolio")))
+            .thenReturn(Mono.just("portfolio"));
+        when(projectService.list(any(ListOptions.class), any(PageRequest.class)))
+            .thenReturn(Mono.just(new ListResult<>(2, 2, 7, List.of(new Project()))));
+        var router = new PortfolioPageRouter(templateNameResolver, settingService, projectService,
+            new ProjectContentRenderer(), new ProjectCardRenderer(projectService));
+        var client = WebTestClient.bindToRouterFunction(router.portfolioPageRouterFunction())
+            .handlerStrategies(HandlerStrategies.builder().viewResolver(new NavigationEchoViewResolver()).build())
+            .build();
+
+        client.get()
+            .uri("/portfolio?page=2&size=2&keyword=Halo&platform=github&type=plugin&tag=Java&featured=true&sort=updated&status=draft")
+            .exchange().expectStatus().isOk().expectBody(String.class)
+            .value(body -> assertThat(body)
+                .contains("page=1", "page=3", "keyword=Halo", "platform=github", "type=plugin", "tag=Java",
+                    "featured=true", "sort=updated", "size=2", "total=7")
+                .doesNotContain("draft"));
+        var options = ArgumentCaptor.forClass(ListOptions.class);
+        var page = ArgumentCaptor.forClass(PageRequest.class);
+        verify(projectService).list(options.capture(), page.capture());
+        assertThat(options.getValue().toString()).contains("status = published", "tags = Java", "techStacks = Java");
+        assertThat(page.getValue().getSort().toString()).isEqualTo("updateTime: DESC,metadata.name: ASC");
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+        "page=bad&size=bad&sort=unsafe&featured=oops,1,12,priority",
+        "page=-1&size=0&sort=recent,1,12,recent",
+        "page=999999999999&size=999999,1,100,priority"
+    })
+    void listPageBoundsPagingAndIgnoresUnsupportedParameters(String params, int expectedPage,
+        int expectedSize, String expectedSort) {
+        when(settingService.getGeneralSetting()).thenReturn(Mono.just(new PortfolioSetting()));
+        when(templateNameResolver.resolveTemplateNameOrDefault(any(), eq("portfolio")))
+            .thenReturn(Mono.just("portfolio"));
+        when(projectService.list(any(ListOptions.class), any(PageRequest.class)))
+            .thenReturn(Mono.just(new ListResult<>(1, expectedSize, 0, List.of())));
+        var router = new PortfolioPageRouter(templateNameResolver, settingService, projectService,
+            new ProjectContentRenderer(), new ProjectCardRenderer(projectService));
+        var client = WebTestClient.bindToRouterFunction(router.portfolioPageRouterFunction())
+            .handlerStrategies(HandlerStrategies.builder().viewResolver(new NavigationEchoViewResolver()).build())
+            .build();
+
+        client.get().uri("/portfolio?" + params).exchange().expectStatus().isOk();
+
+        var options = ArgumentCaptor.forClass(ListOptions.class);
+        var page = ArgumentCaptor.forClass(PageRequest.class);
+        verify(projectService).list(options.capture(), page.capture());
+        // Halo keeps the selector parser's neutral EMPTY condition in its debug string.
+        // Verify the effective filters, not that internal string formatting.
+        assertThat(options.getValue().toString()).contains("status = published")
+            .doesNotContain("featured =", "unsafe", "oops");
+        assertThat(page.getValue().getPageNumber()).isEqualTo(expectedPage);
+        assertThat(page.getValue().getPageSize()).isEqualTo(expectedSize);
+        assertThat(page.getValue().getSort().toString()).isEqualTo("recent".equals(expectedSort)
+            ? "metadata.creationTimestamp: DESC,metadata.name: ASC"
+            : "priority: DESC,metadata.creationTimestamp: DESC,metadata.name: ASC");
+    }
+
+    @Test
+    void listPageEncodesSpecialCharactersInPaginationUrls() {
+        when(settingService.getGeneralSetting()).thenReturn(Mono.just(new PortfolioSetting()));
+        when(templateNameResolver.resolveTemplateNameOrDefault(any(), eq("portfolio")))
+            .thenReturn(Mono.just("portfolio"));
+        when(projectService.list(any(ListOptions.class), any(PageRequest.class)))
+            .thenReturn(Mono.just(new ListResult<>(1, 1, 2, List.of(new Project()))));
+        var router = new PortfolioPageRouter(templateNameResolver, settingService, projectService,
+            new ProjectContentRenderer(), new ProjectCardRenderer(projectService));
+        var client = WebTestClient.bindToRouterFunction(router.portfolioPageRouterFunction())
+            .handlerStrategies(HandlerStrategies.builder().viewResolver(new NavigationEchoViewResolver()).build())
+            .build();
+
+        client.get().uri(java.net.URI.create("/portfolio?size=1&tag=C%2B%2B&keyword=A%26B"))
+            .exchange().expectStatus().isOk().expectBody(String.class)
+            .value(body -> assertThat(body).contains("tag=C%2B%2B", "keyword=A%26B", "page=2"));
     }
 
     @Test
@@ -213,6 +298,19 @@ class PortfolioPageRouterTest {
             .uri("/projects")
             .exchange()
             .expectStatus().isNotFound();
+    }
+
+    private static class NavigationEchoViewResolver implements ViewResolver {
+
+        @Override
+        public Mono<View> resolveViewName(String viewName, Locale locale) {
+            return Mono.just((model, contentType, exchange) -> {
+                var body = model.get("previousPageUrl") + "|" + model.get("nextPageUrl")
+                    + "|total=" + model.get("totalProjects");
+                return exchange.getResponse().writeWith(Mono.just(new DefaultDataBufferFactory()
+                    .wrap(body.getBytes(StandardCharsets.UTF_8))));
+            });
+        }
     }
 
     private static class ModelEchoViewResolver implements ViewResolver {

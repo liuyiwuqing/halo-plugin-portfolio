@@ -11,7 +11,7 @@ repositories {
 }
 
 dependencies {
-    implementation platform('run.halo.tools.platform:plugin:2.25.0')
+    implementation platform('run.halo.tools.platform:plugin:2.27.0')
     implementation 'org.commonmark:commonmark:0.21.0'
     compileOnly 'run.halo.app:api'
 
@@ -22,6 +22,11 @@ dependencies {
 
 test {
     useJUnitPlatform()
+    // 组件注册测试同时验证开发目录和实际打包的索引。
+    dependsOn tasks.named('jar')
+    def pluginJar = tasks.named('jar', Jar).flatMap { it.archiveFile }
+    inputs.file(pluginJar).withPropertyName('pluginJar')
+    systemProperty 'portfolio.pluginJar', pluginJar.get().asFile.absolutePath
 }
 
 java {
@@ -35,7 +40,8 @@ tasks.withType(JavaCompile).configureEach {
     options.release = 21
 }
 
-tasks.register('processUiResources', Copy) {
+// 同步而非叠加历史 hash 文件，避免多次构建把旧 Console 资源一起打入 JAR。
+tasks.register('processUiResources', Sync) {
     from project(':ui').layout.buildDirectory.dir('dist')
     into layout.buildDirectory.dir('resources/main/console')
     dependsOn project(':ui').tasks.named('assemble')
@@ -47,12 +53,25 @@ tasks.named('classes') {
 }
 
 tasks.named('generatePluginComponentsIdx') {
+    // DevTools 会在此任务中写入 plugin.yaml 的版本号，必须晚于资源复制。
+    dependsOn tasks.named('processResources')
     notCompatibleWithConfigurationCache('This task invokes "Task.project" at execution time, which is not supported with configuration cache.')
 }
 
+// 开发模式优先读取 classes/resources；把最新索引放入资源目录，避免读到历史 JAR 的旧索引。
+tasks.register('processPluginComponentsIndex', Copy) {
+    from layout.buildDirectory.file('tmp/META-INF/plugin-components.idx')
+    into layout.buildDirectory.dir('resources/main/META-INF')
+    dependsOn tasks.named('generatePluginComponentsIdx'), tasks.named('processResources')
+}
+
+sourceSets.main.output.dir(
+    [builtBy: tasks.named('processPluginComponentsIndex')],
+    layout.buildDirectory.dir('resources/main'))
+
 halo {
     externalUrl = 'http://127.0.0.1:8090'
-    version = '2.25'
+    version = '2.27'
 }
 
 haloPlugin {

@@ -6,6 +6,7 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
@@ -123,6 +124,10 @@ public class ProjectServiceImpl implements ProjectService {
     }
 
     private Project buildUpdateProject(Project newProject, Project oldProject) {
+        if (!Objects.equals(newProject.getRepoUrl(), oldProject.getRepoUrl())) {
+            // 换绑仓库后旧统计已不再代表当前仓库，等待用户重新同步。
+            oldProject.setRepository(null);
+        }
         updateIfPresent(newProject.getTitle(), oldProject::setTitle);
         updateIfPresent(newProject.getSummary(), oldProject::setSummary, true);
         updateIfPresent(newProject.getContent(), oldProject::setContent, true);

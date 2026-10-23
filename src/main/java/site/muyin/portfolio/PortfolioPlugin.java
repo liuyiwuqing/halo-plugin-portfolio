@@ -53,6 +53,8 @@ public class PortfolioPlugin extends BasePlugin {
                 .indexFunc(Project::getFeatured));
             indexSpecs.add(IndexSpecs.<Project, Integer>single("priority", Integer.class)
                 .indexFunc(Project::getPriority));
+            indexSpecs.add(IndexSpecs.<Project, String>single("updateTime", String.class)
+                .indexFunc(Project::getUpdateTime));
         });
         log.info("Portfolio plugin started.");
     }

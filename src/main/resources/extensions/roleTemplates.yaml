@@ -41,6 +41,9 @@ rules:
     resources:
       - projects
       - projects/delete
+      - projects/sync
+      - projects/preview
+      - projects/import
     verbs:
       - get
       - list
@@ -50,6 +53,8 @@ rules:
   - nonResourceURLs:
       - /apis/console.portfolio.muyin.site/v1alpha1/projects/create
       - /apis/console.portfolio.muyin.site/v1alpha1/projects/update
+      - /apis/console.portfolio.muyin.site/v1alpha1/projects/repository/preview
+      - /apis/console.portfolio.muyin.site/v1alpha1/projects/repository/import
     verbs:
       - create
       - update

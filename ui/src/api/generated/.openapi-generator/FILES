@@ -15,8 +15,12 @@ models/index.ts
 models/json-patch-inner.ts
 models/metadata.ts
 models/move-operation.ts
+models/option-item.ts
 models/project-list.ts
+models/project-options.ts
 models/project.ts
 models/remove-operation.ts
 models/replace-operation.ts
+models/repository-request.ts
+models/repository-snapshot.ts
 models/test-operation.ts

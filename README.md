@@ -21,11 +21,14 @@
 ## 功能特性
 
 - **项目管理** — 在 Halo 控制台创建、编辑、删除项目，支持草稿 / 已发布 / 已归档三种状态
+- **仓库导入** — 粘贴公开 GitHub / Gitee 仓库地址，预览元数据后导入为草稿；重复导入返回冲突提示
+- **手动同步** — 更新 Star、Fork、未关闭 Issue、语言、许可证和仓库状态快照，保留人工维护的项目介绍和发布状态
 - **多平台支持** — 内置 GitHub、Gitee、独立站点、私有项目等平台选项，可在设置中自定义扩展
 - **多类型分类** — 开源项目、产品、插件、网站、工具、类库，同样支持自定义
 - **技术栈 & 标签** — 每个项目可关联多个技术栈和展示标签，方便筛选和检索
 - **推荐项目** — 标记重点项目，在首页或侧边栏优先展示
 - **默认页面** — 开箱即用的 `/portfolio` 列表页和 `/portfolio/{slug}` 详情页，支持主题覆盖
+- **项目发现** — 公开页支持关键词、平台、类型、标签 / 技术栈、推荐筛选和排序；分页保留筛选条件
 - **Finder API** — 注册 `projectFinder`，主题模板可直接调用，灵活控制查询与内容渲染
 - **编辑器卡片** — 在 Halo 富文本编辑器中插入项目卡片，在文章、单页和项目详情中嵌入项目展示
 - **Markdown 内容** — 项目详情支持 Markdown 编写，自动渲染为安全 HTML
@@ -64,6 +67,28 @@ cd plugin-portfolio
 | 类型选项 | 项目类型下拉选项 | 开源项目 / 产品 / 插件 / 网站 / 工具 / 类库 / 其他 |
 
 平台和类型选项支持自由增删改，`value` 建议使用小写英文、数字和下划线。
+
+## GitHub / Gitee 仓库聚合
+
+1. 在作品管理页点击「导入仓库」，输入 `https://github.com/owner/repo` 或 `https://gitee.com/owner/repo`。
+2. 预览仓库信息后确认导入。新项目始终为**草稿**，可以编辑内容、封面和分类后再发布。
+3. 点击项目的「同步仓库」更新快照。已有手动创建的项目，只要配置了受支持的公开仓库地址，也可以同步。
+
+首次导入将仓库名称、简介、主语言、主题和主页分别填入标题、摘要、技术栈、标签和演示地址，并把仓库 README 原始 Markdown 作为详情内容、README 页面地址作为文档地址的默认值；仓库提供方、所有者和名称同时保存。导入标识由提供方、所有者、仓库名和短哈希生成，重复导入同一个仓库不会覆盖已有项目。
+
+后续同步更新 `repository` 快照和项目更新时间；详情内容（Markdown）与文档地址为空时用仓库 README 内容 / 地址回填，已人工编辑则保留。标题、摘要、封面、分类、技术栈、标签、自定义链接、推荐、优先级或发布状态始终保留。平台数据与人工介绍可以不同；详情页显示快照的同步时间。同步失败保留上一次成功快照；同步期间仓库地址变更会返回冲突。
+
+当前支持公开仓库、逐条导入和手动同步，不需要配置 Token。GitHub 未认证 REST 请求通常限制为每 IP 每小时 60 次；Gitee 的限制以实际返回为准。遇到限流、私有仓库、仓库迁移重定向或网络故障会明确失败，稍后重试或更正仓库地址即可。不会自动跟随仓库重定向。
+
+暂不包含私有仓库、自建 Git 服务、账号下仓库批量导入或后台定时同步。后续规划与竞品依据见 [仓库聚合能力分析](docs/portfolio-roadmap.md)。
+
+新增 Console API（需项目管理权限）：
+
+| 方法与路径（前缀 `/apis/console.portfolio.muyin.site/v1alpha1/projects`） | 请求 | 用途 |
+| --- | --- | --- |
+| `POST /repository/preview` | `{ "repoUrl": "https://github.com/owner/repo" }` | 只读预览元数据 |
+| `POST /repository/import` | 同上 | 导入为草稿 |
+| `POST /{slug}/sync` | 无请求体 | 同步仓库快照 |
 
 ## 主题集成
 
@@ -143,6 +168,8 @@ cd plugin-portfolio
 
 主题可通过提供同名模板覆盖默认页面。关闭设置中的「启用默认展示页」后，插件不再注册路由，完全由主题自行渲染。
 
+默认列表页支持 `keyword`、`platform`、`type`、`tag`（标签或技术栈）、`featured`、`page`、`size` 和 `sort` 参数。`sort` 可取 `priority`（默认）、`recent`（最近创建）、`updated`（最近更新）；每页最多 100 条。筛选和分页均使用普通链接 / GET 表单，无需 JavaScript。
+
 ### 编辑器项目卡片
 
 在 Halo 富文本编辑器中，可通过工具栏或斜杠命令 `/` 插入「项目卡片」节点。选择一个已发布项目后，文章中会嵌入一个可交互的卡片组件。
@@ -191,8 +218,9 @@ cd plugin-portfolio
 | `status` | Enum | - | `DRAFT` / `PUBLISHED` / `ARCHIVED` |
 | `createTime` | String | - | 创建时间 |
 | `updateTime` | String | - | 更新时间 |
+| `repository` | RepositorySnapshot | - | 仓库元数据快照，包含 Star / Fork / Issue 数、语言、许可证、主题、归档状态和同步时间 |
 
-另有 `sourceProvider`、`repoOwner`、`repoName` 字段为后续仓库同步功能预留。
+`sourceProvider`、`repoOwner`、`repoName` 在仓库导入时保存来源身份。旧项目没有 `repository` 时仍可正常编辑和展示。
 
 ## 开发
 
@@ -215,6 +243,11 @@ pnpm dev
 ```
 
 Halo 开发服务器默认运行在 `http://localhost:8090`，前端开发服务器提供模块热替换。
+
+新增或删除 Spring 组件后，执行 `./gradlew reloadPlugin` 重新构建并重载插件；需要持续监听时使用 `./gradlew watch`。
+构建会将最新的 `META-INF/plugin-components.idx` 同时写入开发资源目录和插件 JAR。
+这可以避免开发模式下 `build/libs` 留有历史版本 JAR 时，旧索引与新 class 混用而导致 `NoSuchBeanDefinitionException`。
+后端测试会通过 PF4J 类加载器读取实际索引并启动 Spring 上下文，覆盖开发目录和打包产物两条加载路径。
 
 ### 项目结构
 

@@ -42,6 +42,88 @@
             margin-bottom: 28px;
         }
 
+        .portfolio-eyebrow {
+            display: block;
+            margin-bottom: 12px;
+            color: var(--portfolio-accent);
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: .12em;
+        }
+
+        .portfolio-filters {
+            display: grid;
+            grid-template-columns: 2fr repeat(2, minmax(0, 1fr));
+            gap: 16px;
+            padding: 22px;
+            margin-bottom: 24px;
+            background: var(--portfolio-surface);
+            border: 1px solid var(--portfolio-line);
+            border-radius: 8px;
+        }
+
+        .portfolio-field {
+            display: flex;
+            min-width: 0;
+            flex-direction: column;
+            gap: 6px;
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        .portfolio-field input,
+        .portfolio-field select {
+            width: 100%;
+            min-width: 0;
+            min-height: 42px;
+            padding: 9px 11px;
+            border: 1px solid #cbd5e1;
+            border-radius: 5px;
+            background: var(--portfolio-surface);
+            color: var(--portfolio-ink);
+            font: inherit;
+            font-weight: 400;
+        }
+
+        .portfolio-filter-actions,
+        .portfolio-result-bar,
+        .portfolio-pagination {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 14px;
+        }
+
+        .portfolio-filter-actions { grid-column: 1 / -1; }
+        .portfolio-result-bar { justify-content: space-between; margin: 0 0 16px; color: var(--portfolio-muted); font-size: 14px; }
+        .portfolio-button {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 40px;
+            padding: 8px 16px;
+            border: 1px solid var(--portfolio-line);
+            border-radius: 5px;
+            background: var(--portfolio-surface);
+            color: var(--portfolio-ink);
+            font: inherit;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        .portfolio-button--primary { border-color: var(--portfolio-accent); background: var(--portfolio-accent); color: #fff; }
+        .portfolio-button[aria-disabled="true"] { color: #98a2b3; cursor: default; }
+        .portfolio-reset { color: var(--portfolio-accent); font-size: 14px; }
+        .portfolio-pagination { justify-content: center; margin-top: 32px; font-size: 14px; }
+        a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible {
+            outline: 3px solid #2dd4bf;
+            outline-offset: 3px;
+        }
+        a.portfolio-chip:hover { background: #d8eeeb; }
+        .portfolio-empty h2 { margin-top: 0; color: var(--portfolio-ink); font-size: 20px; }
+        .portfolio-empty p { margin: 8px 0 18px; }
+
+
         .portfolio-header h1 {
             margin: 0 0 8px;
             font-size: 34px;
@@ -134,24 +216,94 @@
             border-radius: 8px;
             color: var(--portfolio-muted);
         }
+        .portfolio-card { min-width: 0; }
+        .portfolio-card h2, .portfolio-card p { overflow-wrap: anywhere; }
+
+        @media (max-width: 640px) {
+            .portfolio-page { padding: 32px 16px 48px; }
+            .portfolio-filters { grid-template-columns: minmax(0, 1fr); padding: 16px; gap: 12px; }
+            .portfolio-header h1 { font-size: 28px; }
+            .portfolio-grid { grid-template-columns: minmax(0, 1fr); }
+        }
     </style>
 </head>
 <body>
 <main class="portfolio-page">
     <header class="portfolio-header">
+        <span class="portfolio-eyebrow">PORTFOLIO / 项目集</span>
         <h1 th:text="${title}">项目作品集</h1>
         <p th:text="${description}">集中展示开源项目、产品、插件、工具和其他开发作品。</p>
     </header>
 
+    <form class="portfolio-filters" method="get" action="/portfolio" role="search" aria-label="筛选项目">
+        <label class="portfolio-field">
+            搜索项目
+            <input type="search" name="keyword" th:value="${filters.keyword}" placeholder="输入名称、简介或项目标识"/>
+        </label>
+        <label class="portfolio-field">
+            来源平台
+            <select name="platform">
+                <option value="">全部平台</option>
+                <option th:each="option : ${platformLabels}" th:value="${option.key}" th:text="${option.value}"
+                        th:selected="${filters.platform == option.key}">GitHub</option>
+                <option th:if="${!filters.platform.isEmpty() && !platformLabels.containsKey(filters.platform)}"
+                        th:value="${filters.platform}" th:text="${filters.platform}" selected>其他平台</option>
+            </select>
+        </label>
+        <label class="portfolio-field">
+            项目类型
+            <select name="type">
+                <option value="">全部类型</option>
+                <option th:each="option : ${typeLabels}" th:value="${option.key}" th:text="${option.value}"
+                        th:selected="${filters.type == option.key}">插件</option>
+                <option th:if="${!filters.type.isEmpty() && !typeLabels.containsKey(filters.type)}"
+                        th:value="${filters.type}" th:text="${filters.type}" selected>其他类型</option>
+            </select>
+        </label>
+        <label class="portfolio-field">
+            技术栈或标签
+            <input type="text" name="tag" th:value="${filters.tag}" placeholder="例如 Java、Vue、效率工具"/>
+        </label>
+        <label class="portfolio-field">
+            推荐状态
+            <select name="featured">
+                <option value="">全部项目</option>
+                <option value="true" th:selected="${filters.featured == 'true'}">只看推荐</option>
+                <option value="false" th:selected="${filters.featured == 'false'}">非推荐项目</option>
+            </select>
+        </label>
+        <label class="portfolio-field">
+            排序方式
+            <select name="sort">
+                <option value="priority" th:selected="${filters.sort == 'priority'}">默认排序</option>
+                <option value="recent" th:selected="${filters.sort == 'recent'}">最新收录</option>
+                <option value="updated" th:selected="${filters.sort == 'updated'}">最近更新</option>
+            </select>
+        </label>
+        <input type="hidden" name="size" th:value="${pageSize}"/>
+        <div class="portfolio-filter-actions">
+            <button class="portfolio-button portfolio-button--primary" type="submit">查找项目</button>
+            <a class="portfolio-reset" href="/portfolio">重置筛选</a>
+        </div>
+    </form>
+
+    <div class="portfolio-result-bar" aria-live="polite">
+        <span th:text="|共 ${totalProjects} 个项目|">共 0 个项目</span>
+        <span th:if="${hasFilters}">当前显示符合筛选条件的项目</span>
+    </div>
+
     <div class="portfolio-empty" th:if="${projects.items == null || projects.items.isEmpty()}">
-        暂无公开项目。
+        <h2 th:text="${currentPage > 1 ? '这一页暂无项目' : (hasFilters ? '没有找到匹配的项目' : '暂无公开项目')}">暂无公开项目</h2>
+        <p th:text="${hasFilters ? '试试其他关键词、平台或标签。' : '新的作品正在准备中，欢迎稍后再来。'}">欢迎稍后再来。</p>
+        <a class="portfolio-button" th:if="${currentPage > 1}" th:href="${firstPageUrl}">返回第一页</a>
+        <a class="portfolio-button" th:if="${hasFilters}" href="/portfolio">查看全部项目</a>
     </div>
 
     <section class="portfolio-grid" th:if="${projects.items != null && !projects.items.isEmpty()}">
         <article class="portfolio-card" th:each="project : ${projects.items}">
             <a class="portfolio-card__cover" th:if="${project.cover != null && !project.cover.isEmpty()}"
                th:href="@{'/portfolio/' + ${project.slug}}">
-                <img th:src="${project.cover}" th:alt="${project.title}"/>
+                <img th:src="${project.cover}" th:alt="${project.title}" loading="lazy" decoding="async"/>
             </a>
             <div class="portfolio-meta">
                 <span class="portfolio-chip"
@@ -165,7 +317,17 @@
             </h2>
             <p th:text="${project.summary}">项目摘要</p>
             <div class="portfolio-tags" th:if="${project.techStacks != null && !project.techStacks.isEmpty()}">
-                <span class="portfolio-chip" th:each="stack : ${project.techStacks}" th:text="${stack}">Java</span>
+                <a class="portfolio-chip" th:each="stack : ${project.techStacks}" th:text="${stack}"
+                   th:href="@{/portfolio(tag=${stack})}" th:aria-label="|查看使用 ${stack} 的项目|">Java</a>
+            </div>
+            <div class="portfolio-tags" th:if="${project.tags != null && !project.tags.isEmpty()}">
+                <a class="portfolio-chip" th:each="tag : ${project.tags}" th:text="|# ${tag}|"
+                   th:href="@{/portfolio(tag=${tag})}"># 工具</a>
+            </div>
+            <div class="portfolio-meta" th:if="${project.repository != null}" aria-label="仓库快照">
+                <span class="portfolio-chip" th:text="|${project.repository.stars} Stars|">0 Stars</span>
+                <span class="portfolio-chip" th:text="|${project.repository.forks} Forks|">0 Forks</span>
+                <span class="portfolio-chip" th:if="${project.repository.archived}">已归档</span>
             </div>
             <div class="portfolio-card__footer">
                 <a th:href="@{'/portfolio/' + ${project.slug}}">详情</a>
@@ -176,6 +338,14 @@
             </div>
         </article>
     </section>
+
+    <nav class="portfolio-pagination" th:if="${totalPages > 1 || currentPage > 1}" aria-label="项目分页">
+        <a class="portfolio-button" th:if="${!previousPageUrl.isEmpty()}" th:href="${previousPageUrl}" rel="prev">上一页</a>
+        <span class="portfolio-button" th:if="${previousPageUrl.isEmpty()}" aria-disabled="true">上一页</span>
+        <span th:text="|第 ${currentPage} 页 / 共 ${totalPages} 页|" aria-current="page">第 1 页</span>
+        <a class="portfolio-button" th:if="${!nextPageUrl.isEmpty()}" th:href="${nextPageUrl}" rel="next">下一页</a>
+        <span class="portfolio-button" th:if="${nextPageUrl.isEmpty()}" aria-disabled="true">下一页</span>
+    </nav>
 </main>
 </body>
 </html>

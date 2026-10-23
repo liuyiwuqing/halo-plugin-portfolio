@@ -16,6 +16,7 @@ import org.springframework.web.reactive.function.server.ServerResponse;
 import org.springframework.web.server.ResponseStatusException;
 import reactor.core.publisher.Mono;
 import run.halo.app.extension.PageRequestImpl;
+import run.halo.app.extension.ListResult;
 import run.halo.app.theme.TemplateNameResolver;
 import site.muyin.portfolio.content.ProjectCardRenderer;
 import site.muyin.portfolio.content.ProjectContentRenderer;
@@ -61,13 +62,12 @@ public class PortfolioPageRouter {
             .filter(this::isDefaultPageEnabled)
             .switchIfEmpty(Mono.error(new ResponseStatusException(HttpStatus.NOT_FOUND)))
             .flatMap(setting -> {
-                var page = request.queryParam("page").map(this::parsePositiveInt).orElse(1);
-                var size = request.queryParam("size").map(this::parsePositiveInt)
-                    .orElseGet(() -> setting.getPageSize() == null ? 12 : setting.getPageSize());
+                var pageQuery = PortfolioPageQuery.from(request.queryParams(), setting.getPageSize());
                 var query = new ProjectQuery(request.exchange());
+                pageQuery.filters().forEach(query::setQueryParam);
                 return projectService.list(ProjectServiceImpl.publishedListOptions(query),
-                        PageRequestImpl.of(page, size, ProjectQuery.defaultSort()))
-                    .flatMap(projects -> render(request, LIST_TEMPLATE, pageModel(setting, projects, size)));
+                        PageRequestImpl.of(pageQuery.page(), pageQuery.size(), pageQuery.sort()))
+                    .flatMap(projects -> render(request, LIST_TEMPLATE, pageModel(setting, projects, pageQuery)));
             });
     }
 
@@ -88,12 +88,24 @@ public class PortfolioPageRouter {
                 })));
     }
 
-    private Map<String, Object> pageModel(PortfolioSetting setting, Object projects, int size) {
+    private Map<String, Object> pageModel(PortfolioSetting setting, ListResult<Project> projects,
+        PortfolioPageQuery pageQuery) {
         var model = new HashMap<String, Object>();
         model.put("title", setting.getSeoTitle());
         model.put("description", setting.getSeoDescription());
         model.put("projects", projects);
-        model.put("pageSize", size);
+        model.put("pageSize", pageQuery.size());
+        model.put("filters", pageQuery.filters());
+        model.put("hasFilters", pageQuery.filtered());
+        model.put("currentPage", pageQuery.page());
+        model.put("totalProjects", projects.getTotal());
+        var totalPages = (int) Math.max(1, Math.min(Integer.MAX_VALUE / pageQuery.size(),
+            (projects.getTotal() + pageQuery.size() - 1) / pageQuery.size()));
+        model.put("totalPages", totalPages);
+        model.put("previousPageUrl", pageQuery.page() > 1
+            ? pageQuery.pageUrl(Math.min(pageQuery.page() - 1, totalPages)) : "");
+        model.put("nextPageUrl", pageQuery.page() < totalPages ? pageQuery.pageUrl(pageQuery.page() + 1) : "");
+        model.put("firstPageUrl", pageQuery.pageUrl(1));
         addOptionLabels(model, setting);
         return model;
     }
@@ -143,12 +155,4 @@ public class PortfolioPageRouter {
         return !Boolean.FALSE.equals(setting.getDefaultPageEnabled());
     }
 
-    private int parsePositiveInt(String value) {
-        try {
-            var parsed = Integer.parseInt(value);
-            return parsed > 0 ? parsed : 1;
-        } catch (NumberFormatException e) {
-            return 1;
-        }
-    }
 }
