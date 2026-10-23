@@ -17,4 +17,6 @@ jobs:
       java-version: 21
       skip-appstore-release: false
       app-id: app-ix3j4n6d
+    secrets:
+      halo-pat: ${{ secrets.HALO_PAT }}
 
