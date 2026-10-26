@@ -41,11 +41,21 @@ tasks.withType(JavaCompile).configureEach {
 }
 
 // 同步而非叠加历史 hash 文件，避免多次构建把旧 Console 资源一起打入 JAR。
+// 输出目录必须与 @halo-dev/ui-plugin-bundler-kit 的选择一致：plugin.yaml 的 spec.requires >= 2.25.0 时，
+// 打包器把资源基础路径设为 /plugins/{name}/assets/ui/，Halo 也优先从 JAR 的 ui/ 目录提供控制台资源。
+// 若这里仍输出到 console/，入口 main.js 能加载，但动态分包的 chunk 会全部 404。
+def uiDistDir = project(':ui').layout.buildDirectory.dir('dist')
+def staleConsoleUiDir = layout.buildDirectory.dir('resources/main/console')
+
 tasks.register('processUiResources', Sync) {
-    from project(':ui').layout.buildDirectory.dir('dist')
-    into layout.buildDirectory.dir('resources/main/console')
+    from uiDistDir
+    into layout.buildDirectory.dir('resources/main/ui')
     dependsOn project(':ui').tasks.named('assemble')
     shouldRunAfter tasks.named('processResources')
+    doFirst {
+        // 清理旧版本遗留的 console/ 资源，避免 Halo 回退到与当前打包器不匹配的目录。
+        delete staleConsoleUiDir.get().asFile
+    }
 }
 
 tasks.named('classes') {
